@@ -42,6 +42,7 @@ class FaultInject(torch.autograd.Function):
         input_q = torch.round((input_clamped/delta))
         
         input_q = input_q.to(torch.int8)
+        #print(input_q, max_val, delta)
 
         """ Inject faults in the quantized weight as determined by the bit error map
         """
@@ -50,6 +51,9 @@ class FaultInject(torch.autograd.Function):
         #convert to int8, since this becomes uint8 by default after bitwise op with unsigned biterrormaps
         input_qand = torch.bitwise_and(BitErrorMap1to0,input_q).to(torch.int8)
         input_qor = torch.bitwise_or(BitErrorMap0to1,input_qand).to(torch.int8)
+
+        #print(input_qor)
+            
             
         """
         Dequantize introducing a quantization error in the data along with the weight perturbation 
@@ -133,8 +137,9 @@ class nnLinearPerturbWeight(nn.Linear):
 
         BitErrorMap0to1 = torch.reshape(BitErrorMap0to1, weights.size())
         BitErrorMap1to0 = torch.reshape(BitErrorMap1to0, weights.size())
-
-
+        
+        #print(BitErrorMap0to1)
+        #print(BitErrorMap1to0)
         return BitErrorMap0to1, BitErrorMap1to0
 
 

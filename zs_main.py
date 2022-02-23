@@ -4,14 +4,16 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils import data
 import matplotlib.pyplot as plt
-import numpy as np
+
+import sys, os, argparse
 import pdb
+import numpy as np
+np.set_printoptions(threshold=sys.maxsize)
 
 import zs_train as train
 import zs_test as test
 import zs_weight_prune as wprune
 
-import sys, os, argparse
 import torchvision
 import torchvision.transforms as transforms
 
@@ -28,9 +30,11 @@ from models import resnetf
 torch.manual_seed(0)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-epochs=180
+epochs=60
 batch_size=128
 test_batch_size=100
+
+datafolder = '../ZStressmark/data'
 
 def main(argv):
 
@@ -72,10 +76,10 @@ def main(argv):
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
-        trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+        trainset = torchvision.datasets.CIFAR10(root=datafolder, train=True, download=True, transform=transform_train)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
 
-        testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+        testset = torchvision.datasets.CIFAR10(root=datafolder, train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size, shuffle=False, num_workers=2)
 
 
@@ -91,10 +95,10 @@ def main(argv):
         transforms.Normalize((0.1307,), (0.3081,))
     ])
 
-        trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform_train)
+        trainset = torchvision.datasets.MNIST(root=datafolder, train=True, download=True, transform=transform_train)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
 
-        testset = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=transform_test)
+        testset = torchvision.datasets.MNIST(root=datafolder, train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size, shuffle=False, num_workers=2)
 
     else:
@@ -110,10 +114,10 @@ def main(argv):
         transforms.Normalize((0.2868,), (0.3524,))
     ])
 
-        trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform_train)
+        trainset = torchvision.datasets.FashionMNIST(root=datafolder, train=True, download=True, transform=transform_train)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
 
-        testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform_test)
+        testset = torchvision.datasets.FashionMNIST(root=datafolder, train=False, download=True, transform=transform_test)
         testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size, shuffle=False, num_workers=2)
             
 
@@ -135,9 +139,9 @@ def main(argv):
         prec = 8 # Currently fault injection supported only for 8 bit quantization
         rf = randomfault.RandomFaultModel(args.bit_error_rate, prec, args.position, 0)
         BitErrorMap0 = torch.tensor(rf.BitErrorMap_flip0).to(torch.int32).to(device)
-        BitErrorMap1 = torch.tensor(rf.BitErrorMap_flip0).to(torch.int32).to(device)
-        faulty_layers = ['conv', 'linear']
-        #faulty_layers = ['conv']
+        BitErrorMap1 = torch.tensor(rf.BitErrorMap_flip1).to(torch.int32).to(device)
+        #faulty_layers = ['conv', 'linear']
+        faulty_layers = ['linear']
         if args.arch == 'vgg11':
             model  = vggf('A',in_channels, 10, True, prec, args.bit_error_rate, args.position, BitErrorMap0, BitErrorMap1, faulty_layers)
         elif args.arch == 'vgg16':

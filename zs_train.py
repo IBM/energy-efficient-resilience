@@ -13,20 +13,35 @@ import torchvision
 
 debug=False
 
+import sys
+sys.path.append('./models')
+from models import lenetf
+from models import vggf
+from models import resnetf
+from config import cfg
 
 torch.manual_seed(0)
-def training(trainloader, model, arch, dataset, learning_rate, epochs, voltage, ber, precision, position, error_type, retrain, checkpoint_path, faulty_layers, device ):
 
+def init_models(arch, precision, retrain, checkpoint_path):
 
+    in_channels = 3
+
+    """ unperturbed model 
+    """
+    if arch == 'vgg11':
+      model  = vggf('A',in_channels, 10, True, precision, 0,0, 0,0,[])
+    elif arch == 'vgg16':
+      model  = vggf('D',in_channels, 10, True, precision, 0, 0 ,0,0,[])
+    elif arch == 'resnet18':
+      model = resnetf('resnet18', 10, precision, 0,0,0,0,[]) 
+    elif arch == 'resnet34':
+      model = resnetf('resnet34', 10, precision, 0, 0,0,0,[]) 
+    else:
+      model = lenetf(in_channels,10,precision, 0,0,0,0,[])
+    
     print(model)
-    print('Training with Learning rate %.4f'%(learning_rate))
-    opt = optim.SGD(model.parameters(),lr=learning_rate, momentum=0.9)
 
-    model = model.to(device)
-    #model = torch.nn.DataParallel(model)
-    torch.backends.cudnn.benchmark = True
-
-    checkpoint_epoch=0
+    checkpoint_epoch = 0
     if (retrain):
         print('Restoring model from checkpoint', checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
@@ -37,8 +52,21 @@ def training(trainloader, model, arch, dataset, learning_rate, epochs, voltage, 
         print('Training accuracy =', checkpoint['accuracy'])
         checkpoint_epoch=checkpoint['epoch']
 
-    curr_lr=learning_rate
-    for x in range(epochs):
+    return model, checkpoint_epoch
+
+def training(trainloader, arch, dataset, precision, retrain, checkpoint_path, device):
+
+    model, checkpoint_epoch = init_models(arch, precision, retrain, checkpoint_path)
+
+    print('Training with Learning rate %.4f'%(cfg.learning_rate))
+    opt = optim.SGD(model.parameters(),lr=cfg.learning_rate, momentum=0.9)
+
+    model = model.to(device)
+    #model = torch.nn.DataParallel(model)
+    torch.backends.cudnn.benchmark = True
+
+    curr_lr=cfg.learning_rate
+    for x in range(cfg.epochs):
 
         running_loss = 0.0
         running_correct = 0
@@ -112,7 +140,7 @@ def training(trainloader, model, arch, dataset, learning_rate, epochs, voltage, 
         accuracy = running_correct.double()/(len(trainloader.dataset))
         print('epoch %d loss %.6f accuracy %.6f' %(x, running_loss/(batch_id), accuracy))
         #writer.add_scalar('Loss/train', running_loss/batch_id, x)   ## loss/#batches 
-        if ((x)%40 == 0) or (x==epochs-1):
+        if ((x)%40 == 0) or (x==cfg.epochs-1):
             model_path = arch + '_' + dataset  + '_p_'+ str(precision) + '_model_' + str(checkpoint_epoch+x)+ '.pth'
             torch.save({'epoch': (checkpoint_epoch+x), 'model_state_dict': model.state_dict(), 'optimizer_state_dict': opt.state_dict(), 'loss': running_loss/batch_id, 'accuracy': accuracy}, model_path)
                 #utils.collect_gradients(params, faulty_layers)

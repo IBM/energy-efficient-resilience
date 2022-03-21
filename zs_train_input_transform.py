@@ -23,7 +23,7 @@ from models import resnetf
 
 sys.path.append('./faultmodels')
 from faultmodels import randomfault
-
+import pdb
 torch.manual_seed(0)
 
 
@@ -38,10 +38,8 @@ class Program(nn.Module):
     self.std = Parameter(torch.from_numpy(std).to(device), requires_grad=False)
 
     self.init_mask()
-    self.W = Parameter((torch.randn(self.M.shape) * 2 - 1).to(device) * 0.0001, requires_grad=True)
-    # self.W = Parameter(torch.zeros(self.M.shape), requires_grad=True)
-    # self.W.data = torch.load('train_log_resnet18/lb_2/W_030.pt', map_location=torch.device(device))['W']
-    #self.W = Parameter(torch.load('train_log_resnet18/lb_5e-1/W_030.pt', map_location=torch.device(device)), requires_grad=True)
+    #self.W = Parameter((torch.randn(self.M.shape) * 2 - 1).to(device) * 0.0001, requires_grad=True)
+    self.W = Parameter(torch.zeros(self.M.shape).to(device), requires_grad=True)
 
     self.beta = 22
     self.temperature = self.cfg.temperature
@@ -57,19 +55,14 @@ class Program(nn.Module):
 
 
   def forward(self, image):
-    #X = image.data.new(self.cfg.batch_size, self.cfg.channels, self.cfg.h1, self.cfg.w1)
-    #X[:] = 0
-    #X[:, :, int((self.cfg.h1 - self.cfg.h2) // 2):int((self.cfg.h1 + self.cfg.h2) // 2),
-    #    int((self.cfg.w1 - self.cfg.w2) // 2):int((self.cfg.w1 + self.cfg.w2) // 2)] = image.data.clone()
     X = image.data.clone()
-    #X = Variable(X, requires_grad=True)
     P = self.W #self.dropout(self.W)
-    X_adv = 2 * X - 1
-    X_adv = torch.tanh(0.5 * (torch.log(1 + X_adv + 1e-15) - torch.log(1 - X_adv + 1e-15)) + P)
-    X_adv = 0.5 * X_adv + 0.5
-    print(X_adv.size())
+    #X_adv = 2 * X - 1
+    #X_adv = torch.tanh(0.5 * (torch.log(1 + X_adv + 1e-15) - torch.log(1 - X_adv + 1e-15)) + P)
+    #X_adv = 0.5 * X_adv + 0.5
     # X_adv = torch.clamp(X+P, 0.0, 1.0)
-    X_adv = (X_adv - self.mean) / self.std
+    X_adv = X + P
+    #X_adv = (X_adv - self.mean) / self.std
 
     Y = self.net(X_adv)
     Y_biterror = self.net_biterror(X_adv)
@@ -80,7 +73,7 @@ class Program(nn.Module):
 
 def compute_loss(model_outputs, labels):
   _, preds = torch.max(model_outputs, 1)
-  outputs = outputs.view(outputs.size(0))  ## changing the size from (batch_size,1) to batch_size. 
+  labels = labels.view(labels.size(0))  ## changing the size from (batch_size,1) to batch_size. 
   loss = nn.CrossEntropyLoss()(model_outputs, labels)
   return loss
 
@@ -158,7 +151,6 @@ def transform_train(trainloader, arch, dataset, ber, precision, position, checkp
   lb = cfg.lb
   for x in range(cfg.epochs):
     for batch_id, (image, label) in enumerate(trainloader):
-      lr_scheduler.step()
       #image = tensor2var(image)
       image = image.to(device)
       label = label.to(device)
@@ -169,8 +161,12 @@ def transform_train(trainloader, arch, dataset, ber, precision, position, checkp
       optimizer.zero_grad()
       loss.backward()
       optimizer.step()
-    print('loss %.6f %.6f' %(loss_orig.cpu().numpy(), loss_p.cpu().numpy()))
-    torch.save({'W': get_W}, '%s/W_%03d.pt' % (cfg.save_dir, x))
+      lr_scheduler.step()
+    print('loss %.6f %.6f' %(loss_orig.detach().cpu().numpy(), loss_p.detach().cpu().numpy()))
+    #for p in Pg.parameters():
+    #  if p.requires_grad:
+    #    print(p)
+    #torch.save({'W': get_W}, '%s/W_%03d.pt' % (cfg.save_dir, x))
       #self.validate()
     if x%20==19:
       lb *= 0.5

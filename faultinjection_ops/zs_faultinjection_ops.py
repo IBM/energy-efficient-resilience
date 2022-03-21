@@ -26,7 +26,7 @@ class FaultInject(torch.autograd.Function):
     @staticmethod
     def forward(ctx,input,precision,clamp_val,BitErrorMap0to1, BitErrorMap1to0):
         ctx.save_for_backward(input)
-        ctx.mark_dirty(input)
+        #ctx.mark_dirty(input)
 
         """
         Compute quantization step size. Mapping (-max_val, max_val) linearly to (-127,127)

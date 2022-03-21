@@ -1,0 +1,5 @@
+pip
+virtualenv
+black
+ipython
+pre-commit

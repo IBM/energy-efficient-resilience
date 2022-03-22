@@ -19,6 +19,7 @@ This script checks for the HW support in pytorch
 """
 
 # Built-in modules
+import sys
 
 # Third party modules
 import torch
@@ -30,6 +31,8 @@ import torch
 # Functions
 
 # Main
+
+
 def info(msg):
     print("eerai_torch_support: %s" % str(msg))
 
@@ -48,7 +51,7 @@ def main():
     info("MKL: Available: %s" % torch.backends.mkl.is_available())
     info("MKLDNN: Available: %s" % torch.backends.mkldnn.is_available())
     info("OPENMP: Available: %s" % torch.backends.openmp.is_available())
-    exit(0)
+    sys.exit(0)
 
 
 if __name__ == "__main__":  # run main if executed from the command line
@@ -56,4 +59,4 @@ if __name__ == "__main__":  # run main if executed from the command line
 
     if callable(locals().get("main")):
         main()
-        exit(0)
+        sys.exit(0)

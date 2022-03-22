@@ -19,5 +19,5 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which pylint 2> /dev/null)" != "" ]; then
-    pylint --generated-members=numpy.*,torch.* --disable=C,W,R,similarities $(ls ./*.py */*.py */*/*.py | grep -v ^venv)
+    pylint --generated-members numpy.*,torch.* --disable C --disable W,R,similarities $(ls ./*.py */*.py */*/*.py | grep -v ^venv)
 fi

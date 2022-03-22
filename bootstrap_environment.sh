@@ -26,6 +26,7 @@ fi
 rm -fr "$scriptpath/venv"
 rm -fr "$scriptpath/venv-$name"
 
+set +e
 venvcmd=$(which virtualenv-3)
 if [ "$venvcmd" = "" ]; then
     venvcmd=$(which virtualenv)
@@ -34,13 +35,14 @@ if [ "$venvcmd" = "" ]; then
     echo "virtualenv support not found"
     exit 1
 fi
+set -e
 
 if [ -e "$HOME/scratch" ]; then
     rm -f "$HOME/scratch/venv-$name"
-    virtualenv-3 "$HOME/scratch/venv-$name" --prompt="(EERAI $name) " --python="$(command -v "python$ver")"
+    "$venvcmd" "$HOME/scratch/venv-$name" --prompt="(EERAI $name) " --python="$(command -v "python$ver")"
     ln -s "$HOME/scratch/venv-$name" "$scriptpath/venv-$name"
 else
-    virtualenv-3 "$scriptpath/venv-$name" --prompt="(EERAI $name) " --python="$(command -v "python$ver")"
+    "$venvcmd" "$scriptpath/venv-$name" --prompt="(EERAI $name) " --python="$(command -v "python$ver")"
 fi
 
 ln -s "$scriptpath/venv-$name" "$scriptpath/venv"

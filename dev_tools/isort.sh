@@ -18,13 +18,7 @@
 
 set -e # Finish right after a non-zero return command
 
-if [ "$(which shellcheck 2> /dev/null)" != "" ]; then
-    shellcheck -x -s sh $(ls ./*.sh */*.sh */*/*.sh 2> /dev/null | grep -v ^venv)
+if [ "$(which isort 2> /dev/null)" != "" ]; then
+    isort $(ls ./*.py */*.py */*/*.py 2> /dev/null | grep -v ^venv)
+    isort $(ls ./*.py */*.py */*/*.py 2> /dev/null | grep -v ^venv)
 fi
-
-# Code Conventions (always run)
-./dev_tools/beautysh.sh
-./dev_tools/isort.sh
-./dev_tools/black.sh
-./dev_tools/pylint.sh
-./dev_tools/flake8.sh

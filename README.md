@@ -1,5 +1,5 @@
-Energy Efficient & Resilient AI
-===============================
+EERAI - Energy Efficient & Resilient AI
+=======================================
 
 Training AI models to jointly optimize energy efficiency and resilience.
 
@@ -60,9 +60,7 @@ Contacts
 Nandhini Chandramoorthy <Nandhini.Chandramoorthy@ibm.com>
 Ramon Bertran <rbertra@us.ibm.com>
 
-
-
 [^1]:
-  Note that the installation of pytorch and other dependencies migth require
-  significant amount of space. Plan accordingly to avoid file system related
-  issues.
+    Note that the installation of pytorch and other dependencies migth require
+    significant amount of space. Plan accordingly to avoid file system related
+    issues.

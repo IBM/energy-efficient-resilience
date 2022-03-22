@@ -59,6 +59,6 @@ pip3 install -U $(pip3 list | grep "\." | cut -d " " -f 1)
 pip3 install -U $(pip3 list | grep "\." | cut -d " " -f 1)
 
 {
-    echo "echo EEAI environment activated"
+    echo "echo EERAI environment activated"
     echo "$scriptpath/eerai_torch_support.py"
 } >> "$scriptpath/venv-$name/bin/activate"

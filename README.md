@@ -50,8 +50,11 @@ command you need to execute before starting the experiments.
 Example
 -------
 
-To run an 8-bit model with error injection at the rate of 0.01
-python3 zs_main.py resnet18 eval cifar10 -cp checkpoint.pth -ber 0.01
+To run an 8-bit model with error injection at the rate of 0.01:
+
+```bash
+zs_main.py resnet18 eval cifar10 -ber 0.01
+```
 
 Check and edit if needed config.py for configuration options.
 

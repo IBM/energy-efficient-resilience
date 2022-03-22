@@ -1,11 +1,13 @@
 # Adapted vgg16 from pytorch repo to include my
 # fault injection operators and for cifar10
 
-from faultinjection_ops import zs_faultinjection_ops
-from quantized_ops import zs_quantized_ops
+import sys
+
 import torch
 from torch import nn
-import sys
+
+from faultinjection_ops import zs_faultinjection_ops
+from quantized_ops import zs_quantized_ops
 
 sys.path.append("../quantized_ops")
 sys.path.append("../faultinjection_ops")

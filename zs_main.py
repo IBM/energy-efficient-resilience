@@ -13,23 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torchvision.transforms as transforms
+import argparse
+import sys
+
+import numpy as np
+import torch
 import torchvision
-import zs_train_input_transform as transform
+import torchvision.transforms as transforms
+
 import zs_test as test
 import zs_train as train
+import zs_train_input_transform as transform
 from config import cfg
-import torch
-
-import sys
-import argparse
-import numpy as np
 
 np.set_printoptions(threshold=sys.maxsize)
 
-
 sys.path.append("./faultmodels")
-
 sys.path.append("./models")
 
 torch.manual_seed(0)

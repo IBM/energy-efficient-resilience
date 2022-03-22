@@ -7,8 +7,8 @@ Reference:
     Deep Residual Learning for Image Recognition. arXiv:1512.03385
 """
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class BasicBlock(nn.Module):

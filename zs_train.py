@@ -13,15 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from config import cfg
-from models import resnetf
-from models import vggf
-from models import lenetf
 import sys
-import torch
 
-from torch import nn
+import torch
 import torch.optim as optim
+from torch import nn
+
+from config import cfg
+from models import lenetf, resnetf, vggf
 
 # import torch.nn.functional as F
 # import torchvision
@@ -161,8 +160,7 @@ def training(
         # ## loss/#batches
         if ((x) % 40 == 0) or (x == cfg.epochs - 1):
             model_path = (
-                "/tmp/"
-                + arch
+                arch
                 + "_"
                 + dataset
                 + "_p_"

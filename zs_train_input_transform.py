@@ -13,25 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from faultmodels import randomfault
-from models import resnetf
-from models import vggf
-from models import lenetf
 import sys
-from config import cfg
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn.parameter import Parameter
-import numpy as np
+
+from config import cfg
+from faultmodels import randomfault
+from models import lenetf, resnetf, vggf
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
 sys.path.append("./models")
-
 sys.path.append("./faultmodels")
-
 torch.manual_seed(0)
 
 

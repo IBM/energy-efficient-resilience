@@ -1,7 +1,9 @@
-from quantized_ops import zs_quantized_ops
+import sys
+
 import torch
 from torch import nn
-import sys
+
+from quantized_ops import zs_quantized_ops
 
 sys.path.append("../quantized_ops")
 

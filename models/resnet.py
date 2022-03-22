@@ -4,10 +4,12 @@ Reference:
 [1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
     Deep Residual Learning for Image Recognition. arXiv:1512.03385
 """
-from quantized_ops import zs_quantized_ops
-from torch import nn
-import torch.nn.functional as F
 import sys
+
+import torch.nn.functional as F
+from torch import nn
+
+from quantized_ops import zs_quantized_ops
 
 sys.path.append("../quantized_ops")
 

@@ -13,16 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from faultmodels import randomfault
-from config import cfg
-from models import resnetf
-from models import vggf
-from models import lenetf
 import sys
+
 import torch
 
-
 import zs_hooks_stats as stats
+from config import cfg
+from faultmodels import randomfault
+from models import lenetf, resnetf, vggf
 
 sys.path.append("./models")
 

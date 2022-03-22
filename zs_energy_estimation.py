@@ -14,15 +14,15 @@
 # limitations under the License.
 
 from __future__ import division
+
 import numpy as np
 import torch
 from torch import nn
+
 import zs_hooks_stats as stats
 
 # sys.path.append("./models")
-from models import lenetf
-from models import vggf
-from models import resnetf
+from models import lenetf, resnetf, vggf
 
 verbose = True
 layer_counter = 0

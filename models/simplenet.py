@@ -1,8 +1,7 @@
-from torch import nn
-import torch.nn.functional as F
-
 # CIFAR10
 import torch
+import torch.nn.functional as F
+from torch import nn
 
 # import common.torch
 

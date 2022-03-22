@@ -1,9 +1,11 @@
-from quantized_ops import zs_quantized_ops
-from faultinjection_ops import zs_faultinjection_ops
 import sys
+
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+
+from faultinjection_ops import zs_faultinjection_ops
+from quantized_ops import zs_quantized_ops
 
 sys.path.append("../faultinjection_ops")
 sys.path.append("../quantized_ops")

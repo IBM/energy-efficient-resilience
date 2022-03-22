@@ -1,16 +1,25 @@
+# Copyright 2022 IBM Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Adapted vgg16 from pytorch repo to include my
 # fault injection operators and for cifar10
-
-import sys
 
 import torch
 from torch import nn
 
 from faultinjection_ops import zs_faultinjection_ops
 from quantized_ops import zs_quantized_ops
-
-sys.path.append("../quantized_ops")
-sys.path.append("../faultinjection_ops")
 
 # Per layer clamping currently based on manual values set
 weight_clamp_values = [

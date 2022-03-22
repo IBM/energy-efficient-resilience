@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2022 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import os
 
 import torch
 import torch.optim as optim
@@ -25,9 +24,9 @@ from models import lenetf, resnetf, vggf
 # import torch.nn.functional as F
 # import torchvision
 
-debug = False
+__all__ = ["training"]
 
-sys.path.append("./models")
+debug = False
 torch.manual_seed(0)
 
 
@@ -35,7 +34,8 @@ def init_models(arch, precision, retrain, checkpoint_path):
 
     in_channels = 3
 
-    """ unperturbed model
+    """
+    unperturbed model
     """
     if arch == "vgg11":
         model = vggf("A", in_channels, 10, True, precision, 0, 0, 0, 0, [])
@@ -158,9 +158,17 @@ def training(
         )
         # writer.add_scalar('Loss/train', running_loss/batch_id, x)
         # ## loss/#batches
-        if ((x) % 40 == 0) or (x == cfg.epochs - 1):
+        # if ((x) % 40 == 0) or (x == cfg.epochs - 1):
+        if True:
+
             model_path = (
-                arch
+                cfg.data_dir
+                + "/"
+                + arch
+                + "/"
+                + dataset
+                + "/"
+                + arch
                 + "_"
                 + dataset
                 + "_p_"
@@ -169,6 +177,10 @@ def training(
                 + str(checkpoint_epoch + x)
                 + ".pth"
             )
+
+            if not os.path.exists(os.path.dirname(model_path)):
+                os.makedirs(os.path.dirname(model_path))
+
             torch.save(
                 {
                     "epoch": (checkpoint_epoch + x),

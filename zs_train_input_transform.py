@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2022 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
 import numpy as np
 import torch
 from torch import nn
@@ -25,8 +22,6 @@ from faultmodels import randomfault
 from models import lenetf, resnetf, vggf
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-sys.path.append("./models")
-sys.path.append("./faultmodels")
 torch.manual_seed(0)
 
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2022 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,6 @@
 # limitations under the License.
 
 import re
-import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,8 +21,6 @@ import numpy as np
 # from defs import *
 import torch
 from torch import nn
-
-sys.path.append("./models")
 
 # resnet_layer_1_nza = 0
 # resnet_layer_1_nzw = 0

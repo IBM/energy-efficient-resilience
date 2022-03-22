@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2022 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,19 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
 import torch
 
 import zs_hooks_stats as stats
 from config import cfg
 from faultmodels import randomfault
 from models import lenetf, resnetf, vggf
-
-sys.path.append("./models")
-
-
-sys.path.append("./faultmodels")
 
 debug = False
 visualize = False

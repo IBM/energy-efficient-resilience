@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2022 IBM Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +19,6 @@ import torch
 from torch import nn
 
 import zs_hooks_stats as stats
-
-# sys.path.append("./models")
 from models import lenetf, resnetf, vggf
 
 verbose = True

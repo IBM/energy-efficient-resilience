@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import argparse
+import os
 import sys
 
 import numpy as np
@@ -27,62 +28,101 @@ import zs_train_input_transform as transform
 from config import cfg
 
 np.set_printoptions(threshold=sys.maxsize)
-
-sys.path.append("./faultmodels")
-sys.path.append("./models")
-
 torch.manual_seed(0)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-def main(argv):
+def main():
 
     print("Running command:", str(sys.argv))
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "arch",
-        help="<resnet18> <resnet34> <vgg11> <vgg16> <lenet> "
-        "specify network architecture",
+        help="Input network architecture",
+        choices=["resnet18", "resnet34", "vgg11", "vgg16", "lenet"],
         default="resnet18",
     )
     parser.add_argument(
-        "mode", help="<train> <prune> <eval> specify operation", default="eval"
+        "mode",
+        help="Specify operation to perform",
+        default="eval",
+        choices=["train", "transform", "eval"],
     )
     parser.add_argument(
         "dataset",
-        help="<fashion> <cifar10> <mnist> specify dataset",
+        help="Specify dataset",
+        choices=["cifar10", "mnist", "fashion"],
         default="fashion",
     )
-    parser.add_argument(
+    group = parser.add_argument_group(
+        "Reliability/Error control Options",
+        "Options to control the fault injection details.",
+    )
+    group.add_argument(
         "-ber",
         "--bit_error_rate",
         type=float,
-        help="bit error rate for training corresponding to known voltage",
+        help="Bit error rate for training corresponding to known voltage.",
         default=0.01,
     )
-    parser.add_argument(
+    group.add_argument(
         "-pos",
         "--position",
         type=int,
-        help="specify position of bit errors",
+        help="Position of bit errors.",
         default=-1,
     )
-    parser.add_argument(
+    group = parser.add_argument_group(
+        "Initialization options", "Options to control the initial state."
+    )
+    group.add_argument(
         "-rt",
         "--retrain",
         action="store_true",
-        help="retrain on top of already trained model",
+        help="Retrain on top of already trained model. It will start the "
+        "process from the provided checkpoint.",
         default=False,
     )
-    parser.add_argument(
+    group.add_argument(
         "-cp",
         "--checkpoint",
-        help="Name of the stored model that needs to be "
-        "retrained or used for test",
-        default="./resnet18_checkpoints/resnet_resnet_model_119.pth",
+        help="Name of the stored checkpoint that needs to be "
+        "retrained or used for test.",
+        default=None,
     )
+    group = parser.add_argument_group(
+        "Other options", "Options to control training/validation process."
+    )
+    group.add_argument(
+        "-E",
+        "--epochs",
+        type=int,
+        help="Maxium number of epochs to train.",
+        default=5,
+    )
+    group.add_argument(
+        "-BS",
+        "--batch-size",
+        type=int,
+        help="Training batch size.",
+        default=128,
+    )
+    group.add_argument(
+        "-TBS",
+        "--test-batch-size",
+        type=int,
+        help="Test batch size.",
+        default=100,
+    )
+
     args = parser.parse_args()
+    cfg.epochs = args.epochs
+    cfg.batch_size = args.batch_size
+    cfg.test_batch_size = args.test_batch_size
+
+    if not os.path.exists(cfg.save_dir):
+        os.makedirs(cfg.save_dir)
 
     # if args.position>args.precision-1:
     #    print('ERROR: specified bit position for error exceeds the precision')
@@ -99,18 +139,14 @@ def main(argv):
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-                ),
+                transforms.Normalize(mean, std),
             ]
         )
 
         transform_test = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize(
-                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
-                ),
+                transforms.Normalize(mean, std),
             ]
         )
 
@@ -223,7 +259,7 @@ def main(argv):
             device,
         )
     elif args.mode == "transform":
-
+        print("input_transform_train", args)
         transform.transform_train(
             trainloader,
             args.arch,
@@ -237,6 +273,7 @@ def main(argv):
             device,
         )
     else:
+        print("test model", args)
         test.inference(
             testloader,
             args.arch,
@@ -251,4 +288,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

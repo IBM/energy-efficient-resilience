@@ -115,7 +115,7 @@ def main(argv):
 
     if (args.mode == 'train'):
         print('training args', args)
-        train.training(trainloader, args.arch, dataset, cfg.precision, args.retrain, args.checkpoint, device)
+        train.training(trainloader, in_channels, args.arch, dataset, cfg.precision, args.retrain, args.checkpoint, device)
     elif (args.mode == 'transform'):
         transform.transform_train(trainloader, testloader, in_channels, args.arch, dataset, args.bit_error_rate, cfg.precision, args.position, args.checkpoint, device)
     else:

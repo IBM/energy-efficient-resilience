@@ -43,7 +43,7 @@ cd INSTALLDIRECTORY
 source activate_eerai
 ```
 
-You will see that you command prompt changes. You should be able
+You will see that your command prompt changes. You should be able
 to execute the provided related commands. This should be the only
 command you need to execute before starting the experiments.
 

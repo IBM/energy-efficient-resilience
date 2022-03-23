@@ -56,12 +56,14 @@ def main(argv):
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        transforms.Lambda(lambda t: t * 2 - 1),  # Normalizate image to [-1, 1]
+        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
         transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        transforms.Lambda(lambda t: t*2-1),
+        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
         trainset = torchvision.datasets.CIFAR10(root=cfg.data_dir, train=True, download=True, transform=transform_train)
@@ -115,8 +117,7 @@ def main(argv):
         print('training args', args)
         train.training(trainloader, args.arch, dataset, cfg.precision, args.retrain, args.checkpoint, device)
     elif (args.mode == 'transform'):
-        
-        transform.transform_train(trainloader, args.arch, dataset, args.bit_error_rate, cfg.precision, args.position, args.checkpoint, mean, std, device)
+        transform.transform_train(trainloader, testloader, in_channels, args.arch, dataset, args.bit_error_rate, cfg.precision, args.position, args.checkpoint, device)
     else:
         test.inference(testloader, args.arch, dataset, args.bit_error_rate, cfg.precision, args.position , args.checkpoint, cfg.faulty_layers, device)
 

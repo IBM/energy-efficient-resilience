@@ -6,7 +6,7 @@ import argparse
 #from gen_faultmap import *
 #from defs import *
 import pdb
-import realm_utils as utils
+#import realm_utils as utils
 import torch
 import matplotlib.pyplot as plt
 import multiprocessing as mp

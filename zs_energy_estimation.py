@@ -19,7 +19,7 @@ import torch
 from torch import nn
 
 import zs_hooks_stats as stats
-from models import lenetf, resnetf, vggf
+from models import init_models_faulty
 
 verbose = True
 layer_counter = 0
@@ -352,43 +352,13 @@ def activations(self, input, output):
     layer_counter += 1
 
 
-def init_models(arch, precision, checkpoint_path, device):
-
-    in_channels = 3
-
-    """ unperturbed model
-    """
-    if arch == "vgg11":
-        model = vggf("A", in_channels, 10, True, precision, 0, 0, 0, 0, [])
-    elif arch == "vgg16":
-        model = vggf("D", in_channels, 10, True, precision, 0, 0, 0, 0, [])
-    elif arch == "resnet18":
-        model = resnetf("resnet18", 10, precision, 0, 0, 0, 0, [])
-    elif arch == "resnet34":
-        model = resnetf("resnet34", 10, precision, 0, 0, 0, 0, [])
-    else:
-        model = lenetf(in_channels, 10, precision, 0, 0, 0, 0, [])
-    # print(model)
-
-    model = model.to(device)
-
-    print("Restoring model from checkpoint", checkpoint_path)
-    checkpoint = torch.load(checkpoint_path)
-
-    model.load_state_dict(checkpoint["model_state_dict"])
-    print("restored checkpoint at epoch - ", checkpoint["epoch"])
-    print("Training loss =", checkpoint["loss"])
-    print("Training accuracy =", checkpoint["accuracy"])
-    # checkpoint_epoch = checkpoint["epoch"]
-
-    return model
-
-
 def inference_energy(
-    testloader, arch, dataset, precision, checkpoint_path, device
+    testloader, arch, dataset, precision, checkpoint_path, device, fl, ber, pos
 ):
 
-    model = init_models(arch, precision, checkpoint_path, device)
+    model, checkpoint_epoch = init_models_faulty(
+        arch, precision, True, checkpoint_path, fl, ber, pos
+    )
 
     logger = stats.DataLogger(
         int(len(testloader.dataset) / testloader.batch_size),
@@ -400,8 +370,11 @@ def inference_energy(
         module.module_name = name
         hooks[name] = module.register_forward_hook(activations)
 
-    model.eval()
+    model = model.to(device)
+    # model = torch.nn.DataParallel(model)
+    torch.backends.cudnn.benchmark = True
 
+    model.eval()
     model = model.to(device)
 
     with torch.no_grad():

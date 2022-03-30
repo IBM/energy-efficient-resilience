@@ -18,8 +18,7 @@ from torch import nn
 from torch.nn.parameter import Parameter
 
 from config import cfg
-from faultmodels import randomfault
-from models import lenetf, resnetf, vggf
+from models import init_models_pairs
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 torch.manual_seed(0)
@@ -88,134 +87,32 @@ def compute_loss(model_outputs, labels):
     return loss
 
 
-def init_models(
-    arch, bit_error_rate, precision, position, faulty_layers, checkpoint_path
-):
-
-    in_channels = 3
-    prec = 8  # Currently fault injection supported only for 8 bit quantization
-
-    """ unperturbed model """
-    if arch == "vgg11":
-        model = vggf("A", in_channels, 10, True, prec, 0, 0, 0, 0, [])
-    elif arch == "vgg16":
-        model = vggf("D", in_channels, 10, True, prec, 0, 0, 0, 0, [])
-    elif arch == "resnet18":
-        model = resnetf("resnet18", 10, prec, 0, 0, 0, 0, [])
-    elif arch == "resnet34":
-        model = resnetf("resnet34", 10, prec, 0, 0, 0, 0, [])
-    else:
-        model = lenetf(in_channels, 10, prec, 0, 0, 0, 0, [])
-
-    """ Perturbed model, where the weights are injected with
-    bit errors at the rate of ber """
-
-    rf = randomfault.RandomFaultModel(bit_error_rate, prec, position, 0)
-    BitErrorMap0 = (
-        torch.tensor(rf.BitErrorMap_flip0).to(torch.int32).to(device)
-    )
-    BitErrorMap1 = (
-        torch.tensor(rf.BitErrorMap_flip1).to(torch.int32).to(device)
-    )
-    if arch == "vgg11":
-        model_p = vggf(
-            "A",
-            in_channels,
-            10,
-            True,
-            prec,
-            bit_error_rate,
-            position,
-            BitErrorMap0,
-            BitErrorMap1,
-            faulty_layers,
-        )
-    elif arch == "vgg16":
-        model_p = vggf(
-            "D",
-            in_channels,
-            10,
-            True,
-            prec,
-            bit_error_rate,
-            position,
-            BitErrorMap0,
-            BitErrorMap1,
-            faulty_layers,
-        )
-    elif arch == "resnet18":
-        model_p = resnetf(
-            "resnet18",
-            10,
-            prec,
-            bit_error_rate,
-            position,
-            BitErrorMap0,
-            BitErrorMap1,
-            faulty_layers,
-        )
-    elif arch == "resnet34":
-        model_p = resnetf(
-            "resnet34",
-            10,
-            prec,
-            bit_error_rate,
-            position,
-            BitErrorMap0,
-            BitErrorMap1,
-            faulty_layers,
-        )
-    else:
-        model_p = lenetf(
-            in_channels,
-            10,
-            prec,
-            bit_error_rate,
-            position,
-            BitErrorMap0,
-            BitErrorMap1,
-            faulty_layers,
-        )
-
-    print(model)
-    print(model_p)
-
-    model = model.to(device)
-    model_p = model_p.to(device)
-
-    print("Restoring model from checkpoint", checkpoint_path)
-    checkpoint = torch.load(checkpoint_path)
-
-    model.load_state_dict(checkpoint["model_state_dict"])
-    print("restored checkpoint at epoch - ", checkpoint["epoch"])
-    print("Training loss =", checkpoint["loss"])
-    print("Training accuracy =", checkpoint["accuracy"])
-
-    # checkpoint_epoch = checkpoint["epoch"]
-
-    model_p.load_state_dict(checkpoint["model_state_dict"])
-
-    return model, model_p
-
-
 def transform_train(
     trainloader,
     arch,
     dataset,
-    ber,
     precision,
-    position,
+    retrain,
     checkpoint_path,
+    force,
+    device,
+    fl,
+    ber,
+    pos,
     mean,
     std,
-    device,
 ):
 
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
-    model, model_perturbed = init_models(
-        arch, ber, precision, position, cfg.faulty_layers, checkpoint_path
+    (
+        model,
+        checkpoint_epoch,
+        model_perturbed,
+        checkpoint_epoch_perturbed,
+    ) = init_models_pairs(
+        arch, precision, retrain, checkpoint_path, fl, ber, pos
     )
 
     mean = mean[..., np.newaxis, np.newaxis]

@@ -26,6 +26,7 @@ import zs_test as test
 import zs_train as train
 import zs_train_input_transform as transform
 from config import cfg
+from models import default_base_model_path
 
 np.set_printoptions(threshold=sys.maxsize)
 torch.manual_seed(0)
@@ -80,7 +81,8 @@ def main():
         "-rt",
         "--retrain",
         action="store_true",
-        help="Retrain on top of already trained model. It will start the "
+        help="Continue training on top of already trained model."
+        "It will start the "
         "process from the provided checkpoint.",
         default=False,
     )
@@ -88,8 +90,15 @@ def main():
         "-cp",
         "--checkpoint",
         help="Name of the stored checkpoint that needs to be "
-        "retrained or used for test.",
+        "retrained or used for test (only used if -rt flag is set).",
         default=None,
+    )
+    group.add_argument(
+        "-F",
+        "--force",
+        action="store_true",
+        help="Do not fail if checkpoint already exists. Overwrite it.",
+        default=False,
     )
     group = parser.add_argument_group(
         "Other options", "Options to control training/validation process."
@@ -246,6 +255,20 @@ def main():
         )
 
     print("Device", device)
+    cfg.device = device
+
+    assert isinstance(cfg.faulty_layers, list)
+
+    if args.checkpoint is None:
+        args.checkpoint = default_base_model_path(
+            cfg.data_dir,
+            args.arch,
+            dataset,
+            cfg.precision,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
 
     if args.mode == "train":
         print("training args", args)
@@ -256,7 +279,11 @@ def main():
             cfg.precision,
             args.retrain,
             args.checkpoint,
+            args.force,
             device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
         )
     elif args.mode == "transform":
         print("input_transform_train", args)
@@ -264,27 +291,32 @@ def main():
             trainloader,
             args.arch,
             dataset,
-            args.bit_error_rate,
             cfg.precision,
-            args.position,
+            args.retrain,
             args.checkpoint,
+            args.force,
+            device,
+            args.faulty_layers,
+            args.bit_error_rate,
+            args.position,
             mean,
             std,
-            device,
         )
-    else:
+    elif args.mode == "eval":
         print("test model", args)
         test.inference(
             testloader,
             args.arch,
             dataset,
-            args.bit_error_rate,
             cfg.precision,
-            args.position,
             args.checkpoint,
-            cfg.faulty_layers,
             device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
         )
+    else:
+        raise NotImplementedError
 
 
 if __name__ == "__main__":

@@ -16,9 +16,6 @@ import re
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-# from gen_faultmap import *
-# from defs import *
 import torch
 from torch import nn
 
@@ -49,7 +46,7 @@ vgg_layer_7 = 0
 vgg_layer_8 = 0
 
 
-debug = True
+debug = False
 
 
 class DataLogger:

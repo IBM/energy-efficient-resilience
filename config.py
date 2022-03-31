@@ -45,5 +45,6 @@ cfg.flow_lr = 2e-3
 cfg.decay = 0.96
 cfg.max_epoch = 1
 cfg.lb = 1
+cfg.seed = 0
 
 cfg.device = None

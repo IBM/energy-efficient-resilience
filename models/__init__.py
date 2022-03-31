@@ -28,13 +28,11 @@ from .vgg import vgg  # noqa: F401
 from .vggf import vggf  # noqa: F401
 
 
-def init_models(arch, precision, retrain, checkpoint_path):
+def init_models(arch, in_channels, precision, retrain, checkpoint_path):
 
     """
     Default model loader
     """
-
-    in_channels = 3
 
     if arch == "vgg11":
         model = vggf("A", in_channels, 10, True, precision, 0, 0, 0, 0, [])
@@ -75,27 +73,29 @@ def init_models(arch, precision, retrain, checkpoint_path):
 
 def init_models_faulty(
     arch,
+    in_channels,
     precision,
     retrain,
     checkpoint_path,
     faulty_layers,
     bit_error_rate,
     position,
+    seed=0,
 ):
 
     """
     Perturbed (if needed) model loader.
     """
 
-    in_channels = 3
-
     if not cfg.faulty_layers or len(cfg.faulty_layers) == 0:
-        return init_models(arch, precision, retrain, checkpoint_path)
+        return init_models(
+            arch, in_channels, precision, retrain, checkpoint_path
+        )
     else:
         """Perturbed models, where the weights are injected with bit
         errors at the rate of ber at the specified positions"""
         rf = randomfault.RandomFaultModel(
-            bit_error_rate, precision, position, 0
+            bit_error_rate, precision, position, seed
         )
         BitErrorMap0 = (
             torch.tensor(rf.BitErrorMap_flip0).to(torch.int32).to(cfg.device)
@@ -191,27 +191,31 @@ def init_models_faulty(
 
 def init_models_pairs(
     arch,
+    in_channels,
     precision,
     retrain,
     checkpoint_path,
     faulty_layers,
     bit_error_rate,
     position,
+    seed=0,
 ):
 
     """Load the default model as well as the corresponding perturbed model"""
 
     model, checkpoint_epoch = init_models(
-        arch, precision, retrain, checkpoint_path[0]
+        arch, in_channels, precision, retrain, checkpoint_path[0]
     )
     model_p, checkpoint_epoch_p = init_models_faulty(
         arch,
+        in_channels,
         precision,
         retrain,
         checkpoint_path[1],
         faulty_layers,
         bit_error_rate,
         position,
+        seed=seed,
     )
 
     return model, checkpoint_epoch, model_p, checkpoint_epoch_p

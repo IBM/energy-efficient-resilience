@@ -25,6 +25,7 @@ def inference(
     testloader,
     arch,
     dataset,
+    in_channels,
     precision,
     checkpoint_path,
     device,
@@ -33,7 +34,14 @@ def inference(
     position,
 ):
     model, checkpoint_epoch = init_models_faulty(
-        arch, precision, True, checkpoint_path, faulty_layers, ber, position
+        arch,
+        in_channels,
+        precision,
+        True,
+        checkpoint_path,
+        faulty_layers,
+        ber,
+        position,
     )
 
     if arch == "resnet18" or arch == "resnet34":

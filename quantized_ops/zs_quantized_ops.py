@@ -36,7 +36,16 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
 
     # Quantize and dequantize in the forward pass
     @staticmethod
-    def forward(ctx, input, precision, clamp_val):
+    def forward(ctx, input, precision, clamp_val, use_max=True):
+        """
+        Quantize and dequantize the model weights.
+        The gradients will be applied to origin weights.
+        :param ctx: Bulid-in parameter.
+        :param input: Model weights.
+        :param precision: The number of bits would be used to quantize the
+                          model.
+        :param clamp_val: The range to be used to clip the weights.
+        """
         ctx.save_for_backward(input)
         # ctx.mark_dirty(input)
 
@@ -44,7 +53,6 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
         Compute quantization step size.
         Mapping (-max_val, max_val) linearly to (-127,127)
         """
-        use_max = True  # fix me : Need to add a parameter for this one !
         if use_max:
             max_val = torch.max(torch.abs(input))
         else:
@@ -65,15 +73,21 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
         """
         input_dq = input_q * delta
         input_dq = input_dq.to(torch.float32)
-        # Copy elements of the dequantized tensor into the input weight tensor
-        # in place and return input weight tensor
-        return input.copy_(input_dq)
+        # Return the dequantized weights tensor.
+        # We want to update the original weights(not quantized weights) under
+        # quantization aware training.
+        # So, we don't use input.copy_(input_dq) to replace self.weight with
+        # input_dq.
+        return input_dq
 
     # Straight-through-estimator in backward pass
+    # https://discuss.pytorch.org/t/
+    #                       integrating-a-new-loss-function-to-autograd/3684/2
+    # Without using this will cause gradients problems.
     @staticmethod
     def backward(ctx, grad_output):
         (input,) = ctx.saved_tensors
-        return grad_output, None
+        return grad_output, None, None
 
 
 class nnLinearSymQuant(nn.Linear):
@@ -88,11 +102,11 @@ class nnLinearSymQuant(nn.Linear):
         super().__init__(in_features, out_features, bias)
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(out_features))
-        else:
-            self.register_parameter("bias", None)
+        # self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        # if bias:
+        #    self.bias = nn.Parameter(torch.Tensor(out_features))
+        # else:
+        #    self.register_parameter('bias', None)
         self.precision = precision
         self.clamp_val = clamp_val
         self.reset_parameters()
@@ -100,8 +114,8 @@ class nnLinearSymQuant(nn.Linear):
     def forward(self, input):
         if self.precision > 0:
             quantWeight = SymmetricQuantizeDequantize.apply
-            quantWeight(self.weight, self.precision, self.clamp_val)
-        return F.linear(input, self.weight, self.bias)
+            weight = quantWeight(self.weight, self.precision, self.clamp_val)
+        return F.linear(input, weight, self.bias)
 
     def extra_repr(self) -> str:
         return "in_features={}, out_features={}, bias={}, precision={}".format(
@@ -156,22 +170,21 @@ class nnConv2dSymQuant(nn.Conv2d):
         self.precision = precision
         self.clamp_val = clamp_val
 
-    def conv2d_forward(self, input, weight):
+    def forward(self, input):
+        if self.precision > 0:
+            quantWeight = SymmetricQuantizeDequantize.apply
+            quant_weight = quantWeight(
+                self.weight, self.precision, self.clamp_val
+            )
         return F.conv2d(
             input,
-            weight,
+            quant_weight,
             self.bias,
             self.stride,
             self.padding,
             self.dilation,
             self.groups,
         )
-
-    def forward(self, input):
-        if self.precision > 0:
-            quantWeight = SymmetricQuantizeDequantize.apply
-            quantWeight(self.weight, self.precision, self.clamp_val)
-        return self.conv2d_forward(input, self.weight)
 
 
 def nnConv2dSymQuant_op(

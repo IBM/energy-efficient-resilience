@@ -22,9 +22,6 @@ from torch import nn
 from config import cfg
 from models import default_model_path, init_models_faulty
 
-# import torch.nn.functional as F
-# import torchvision
-
 __all__ = ["training"]
 
 debug = False
@@ -35,6 +32,7 @@ def training(
     trainloader,
     arch,
     dataset,
+    in_channels,
     precision,
     retrain,
     checkpoint_path,
@@ -45,8 +43,22 @@ def training(
     pos,
 ):
 
+    """
+    Apply quantization aware training.
+    :param trainloader: The loader of training data.
+    :param arch: A string. The architecture of the model would be used.
+    :param dataset: A string. The name of the training data.
+    :param in_channels: An int. The input channels of the training data.
+    :param precision: An int. The number of bits would be used to quantize
+                              the model.
+    :param retrain: A boolean. Start from checkpoint.
+    :param checkpoint_path: A string. The path that stores the models.
+    :param force: Overwrite checkpoint.
+    :param device: A string. Specify using GPU or CPU.
+    """
+
     model, checkpoint_epoch = init_models_faulty(
-        arch, precision, retrain, checkpoint_path, fl, ber, pos
+        arch, in_channels, precision, retrain, checkpoint_path, fl, ber, pos
     )
 
     print("Training with Learning rate %.4f" % (cfg.learning_rate))
@@ -56,7 +68,6 @@ def training(
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
-    curr_lr = cfg.learning_rate
     for x in range(checkpoint_epoch + 1, cfg.epochs):
 
         print("Epoch: %03d" % x)
@@ -83,6 +94,7 @@ def training(
                         print(model.fc2.weight[0:3, 0:3])
                         print(model.conv1.weight[0, 0, :, :])
 
+            model.train()
             model_outputs = model(inputs)  # pylint: disable=E1102
 
             _, preds = torch.max(model_outputs, 1)
@@ -98,9 +110,6 @@ def training(
                         print(model.conv1.weight[0, 0, :, :])
 
             loss = nn.CrossEntropyLoss()(model_outputs, outputs)
-
-            if debug:
-                print("epoch %d batch %d loss %.3f" % (x, batch_id, loss))
 
             # Compute gradient of perturbed weights with perturbed loss
             loss.backward()
@@ -123,21 +132,12 @@ def training(
             running_loss += loss.item()
             running_correct += torch.sum(preds == outputs.data)
 
-        # update learning rate
-        if (x == 80) or (x == 120):
-            curr_lr /= 10.0
-            for param_group in opt.param_groups:
-                param_group["lr"] = curr_lr
-            print("Training with Learning rate %.4f" % (curr_lr))
-
         accuracy = running_correct.double() / (len(trainloader.dataset))
         print(
-            "epoch %d loss %.6f accuracy %.6f"
-            % (x, running_loss / (batch_id), accuracy)
+            "For epoch: {}, loss: {:.6f}, accuracy: {:.5f}".format(
+                x, running_loss / len(trainloader.dataset), accuracy
+            )
         )
-        # writer.add_scalar('Loss/train', running_loss/batch_id, x)
-        # ## loss/#batches
-        # if ((x) % 40 == 0) or (x == cfg.epochs - 1):
         if True:
 
             model_path = default_model_path(
@@ -161,4 +161,3 @@ def training(
                 },
                 model_path,
             )
-            # utils.collect_gradients(params, faulty_layers)

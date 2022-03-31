@@ -37,7 +37,11 @@ dtype = torch.float32
 
 
 class FaultInject(torch.autograd.Function):
-    # Quantize and dequantize in the forward pass
+    """
+    Perturb the model weights.
+    Later, quantize and dequantize the model weights in the forward pass.
+    """
+
     @staticmethod
     def forward(
         ctx, input, precision, clamp_val, BitErrorMap0to1, BitErrorMap1to0
@@ -60,37 +64,37 @@ class FaultInject(torch.autograd.Function):
         input_q = torch.round((input_clamped / delta))
 
         input_q = input_q.to(torch.int8)
-        # print(input_q, max_val, delta)
-
-        """ Inject faults in the quantized weight as determined by the bit
-        error map
+        """
+            Inject faults in the quantized weight
+            as determined by the bit error map
         """
 
         # BitErrorMap0, BitErrorMap1 = self.MapWeightsToBitErrors(numWeights)
-        # convert to int8, since this becomes uint8 by default after bitwise
-        # op with unsigned biterrormaps
+        # convert to int8, since this becomes uint8 by default
+        # after bitwise op with unsigned biterrormaps
         input_qand = torch.bitwise_and(BitErrorMap1to0, input_q).to(torch.int8)
         input_qor = torch.bitwise_or(BitErrorMap0to1, input_qand).to(
             torch.int8
         )
 
-        # print(input_qor)
-
         """
-        Dequantize introducing a quantization error in the data along with
-        the weight perturbation
+            Dequantize introducing a quantization error in the
+            data along with the weight perturbation
         """
         input_dq = input_qor * delta
         input_dq = input_dq.to(torch.float32)
-        # Copy elements of the dequantized tensor into the input weight tensor
-        # in place and return input weight tensor
-        return input.copy_(input_dq)
+
+        # Return the perturbed-dequantized weights tensor.
+        # We want to perturb the weights just for one time.
+        # So, we don't use input.copy_(input_dq) to replace
+        # self.weight with input_dq.
+        return input_dq
 
     # Straight-through-estimator in backward pass
     @staticmethod
     def backward(ctx, grad_output):
         (input,) = ctx.saved_tensors
-        return grad_output, None
+        return grad_output, None, None, None, None
 
 
 class nnLinearPerturbWeight(nn.Linear):
@@ -114,11 +118,11 @@ class nnLinearPerturbWeight(nn.Linear):
         super().__init__(in_features, out_features, bias)
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(out_features))
-        else:
-            self.register_parameter("bias", None)
+        # self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        # if bias:
+        #    self.bias = nn.Parameter(torch.Tensor(out_features))
+        # else:
+        #    self.register_parameter('bias', None)
         self.precision = precision
         self.clamp_val = clamp_val
         self.BitErrorMap0 = BitErrorMap0to1
@@ -134,14 +138,14 @@ class nnLinearPerturbWeight(nn.Linear):
                 self.weight,
             )
             perturbweight = FaultInject.apply
-            perturbweight(
+            perturbed_weights = perturbweight(
                 self.weight,
                 self.precision,
                 self.clamp_val,
                 BitErrorMap0to1,
                 BitErrorMap1to0,
             )
-        return F.linear(input, self.weight, self.bias)
+        return F.linear(input, perturbed_weights, self.bias)
 
     def extra_repr(self) -> str:
         return "in_features={}, out_features={}, bias={}, precision={}".format(
@@ -193,8 +197,6 @@ class nnLinearPerturbWeight(nn.Linear):
         BitErrorMap0to1 = torch.reshape(BitErrorMap0to1, weights.size())
         BitErrorMap1to0 = torch.reshape(BitErrorMap1to0, weights.size())
 
-        # print(BitErrorMap0to1)
-        # print(BitErrorMap1to0)
         return BitErrorMap0to1, BitErrorMap1to0
 
 
@@ -259,17 +261,6 @@ class nnConv2dPerturbWeight(nn.Conv2d):
         self.BitErrorMap0 = BitErrorMap0to1
         self.BitErrorMap1 = BitErrorMap1to0
 
-    def conv2d_forward(self, input, weight):
-        return F.conv2d(
-            input,
-            weight,
-            self.bias,
-            self.stride,
-            self.padding,
-            self.dilation,
-            self.groups,
-        )
-
     def forward(self, input):
         if self.precision > 0:
             BitErrorMap0to1, BitErrorMap1to0 = self.genFaultMap(
@@ -279,14 +270,22 @@ class nnConv2dPerturbWeight(nn.Conv2d):
                 self.weight,
             )
             perturbweight = FaultInject.apply
-            perturbweight(
+            perturbed_weights = perturbweight(
                 self.weight,
                 self.precision,
                 self.clamp_val,
                 BitErrorMap0to1,
                 BitErrorMap1to0,
             )
-        return self.conv2d_forward(input, self.weight)
+        return F.conv2d(
+            input,
+            perturbed_weights,
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+        )
 
     def genFaultMap(
         self, BitErrorMap_flip0to1, BitErrorMap_flip1to0, precision, weights

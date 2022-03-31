@@ -353,11 +353,20 @@ def activations(self, input, output):
 
 
 def inference_energy(
-    testloader, arch, dataset, precision, checkpoint_path, device, fl, ber, pos
+    testloader,
+    arch,
+    in_channels,
+    dataset,
+    precision,
+    checkpoint_path,
+    device,
+    fl,
+    ber,
+    pos,
 ):
 
     model, checkpoint_epoch = init_models_faulty(
-        arch, precision, True, checkpoint_path, fl, ber, pos
+        arch, in_channels, precision, True, checkpoint_path, fl, ber, pos
     )
 
     logger = stats.DataLogger(

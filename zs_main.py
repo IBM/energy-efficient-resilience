@@ -139,23 +139,21 @@ def main():
 
     print("Preparing data..", args.dataset)
     if args.dataset == "cifar10":
-        mean = np.array([0.4914, 0.4822, 0.4465], dtype=np.float32)
-        std = np.array([0.2023, 0.1994, 0.2010], dtype=np.float32)
         dataset = "cifar"
-        # in_channels = 3
+        in_channels = 3
         transform_train = transforms.Compose(
             [
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize(mean, std),
+                transforms.Lambda(lambda t: t * 2 - 1),
             ]
         )
 
         transform_test = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize(mean, std),
+                transforms.Lambda(lambda t: t * 2 - 1),
             ]
         )
 
@@ -184,7 +182,7 @@ def main():
 
     elif args.dataset == "mnist":
         dataset = "mnist"
-        # in_channels = 1
+        in_channels = 1
         transform_train = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         )
@@ -217,7 +215,7 @@ def main():
 
     else:
         dataset = "fashion"
-        # in_channels = 1
+        in_channels = 1
         transform_train = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -276,6 +274,7 @@ def main():
             trainloader,
             args.arch,
             dataset,
+            in_channels,
             cfg.precision,
             args.retrain,
             args.checkpoint,
@@ -289,8 +288,10 @@ def main():
         print("input_transform_train", args)
         transform.transform_train(
             trainloader,
+            testloader,
             args.arch,
             dataset,
+            in_channels,
             cfg.precision,
             args.retrain,
             args.checkpoint,
@@ -299,8 +300,6 @@ def main():
             args.faulty_layers,
             args.bit_error_rate,
             args.position,
-            mean,
-            std,
         )
     elif args.mode == "eval":
         print("test model", args)
@@ -308,6 +307,7 @@ def main():
             testloader,
             args.arch,
             dataset,
+            in_channels,
             cfg.precision,
             args.checkpoint,
             device,

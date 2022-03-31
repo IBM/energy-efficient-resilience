@@ -14,12 +14,6 @@
 
 import numpy as np
 
-# from gen_faultmap import *
-# from defs import *
-
-# import realm_utils as utils
-
-
 # This class of model is characterized by the following parameters -
 # ber - bit error rate = count of faulty bits / total bits at a given voltage
 # prob - likelihood of a faulty bit cell being faulty -- i.e likelihood of a

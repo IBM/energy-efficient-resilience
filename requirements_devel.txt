@@ -1,0 +1,9 @@
+pip
+virtualenv
+black
+ipython
+pre-commit
+flake8
+beautysh
+pylint
+autopep8

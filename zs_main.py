@@ -257,7 +257,7 @@ def main():
 
     assert isinstance(cfg.faulty_layers, list)
 
-    if args.checkpoint is None:
+    if args.checkpoint is None and args.mode != "transform":
         args.checkpoint = default_base_model_path(
             cfg.data_dir,
             args.arch,
@@ -266,6 +266,30 @@ def main():
             cfg.faulty_layers,
             args.bit_error_rate,
             args.position,
+        )
+    elif args.checkpoint is None and args.mode == "transform":
+        args.checkpoint = []
+        args.checkpoint.append(
+            default_base_model_path(
+                cfg.data_dir,
+                args.arch,
+                dataset,
+                cfg.precision,
+                [],
+                args.bit_error_rate,
+                args.position,
+            )
+        )
+        args.checkpoint.append(
+            default_base_model_path(
+                cfg.data_dir,
+                args.arch,
+                dataset,
+                cfg.precision,
+                cfg.faulty_layers,
+                args.bit_error_rate,
+                args.position,
+            )
         )
 
     if args.mode == "train":
@@ -293,11 +317,10 @@ def main():
             dataset,
             in_channels,
             cfg.precision,
-            args.retrain,
             args.checkpoint,
             args.force,
             device,
-            args.faulty_layers,
+            cfg.faulty_layers,
             args.bit_error_rate,
             args.position,
         )

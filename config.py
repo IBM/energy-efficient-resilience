@@ -18,7 +18,7 @@ cfg = EasyDict()
 
 cfg.faulty_layers = []
 # cfg.faulty_layers = ['linear']
-# cfg.faulty_layers = ['linear', 'conv']
+cfg.faulty_layers = ["linear", "conv"]
 
 cfg.batch_size = 128
 cfg.test_batch_size = 100

@@ -60,8 +60,9 @@ Check and edit if needed config.py for configuration options.
 
 Contacts
 --------
-Nandhini Chandramoorthy <Nandhini.Chandramoorthy@ibm.com>
-Ramon Bertran <rbertra@us.ibm.com>
+
+- Nandhini Chandramoorthy <Nandhini.Chandramoorthy@ibm.com>
+- Ramon Bertran <rbertra@us.ibm.com>
 
 [^1]:
     Note that the installation of pytorch and other dependencies migth require

@@ -1,0 +1,35 @@
+language: python
+python:
+    - 3.9
+os:
+    - linux
+cache:
+    apt: true
+    pip: true
+    timeout: 1000
+dist: bionic
+git:
+    submodules: false
+addons:
+    apt:
+        packages:
+            - shellcheck
+stages:
+    - shell_conventions
+    - tests
+jobs:
+    fast_finish: true
+    include:
+        - stage: shell_conventions
+          name: shell conventions
+          script:
+              - set -e
+              - pip3 install -U -r requirements_devel.txt
+              - env
+              - ./dev_tools/format_and_check_code.sh
+        - stage: tests
+          name: integration tests
+          script:
+              - set -e
+              - pip3 install -U -r requirements_devel.txt
+              - true

@@ -4,12 +4,11 @@ EERAI - Energy Efficient & Resilient AI
 Training AI models to jointly optimize energy efficiency and resilience.
 
 [![Build Status](https://app.travis-ci.com/IBM/energy-efficient-resilience.svg?branch=main)](https://app.travis-ci.com/IBM/energy-efficient-resilience)
-
 ![GitHub](https://img.shields.io/github/license/IBM/energy-efficient-resilience.svg)
+
 ![GitHub forks](https://img.shields.io/github/forks/IBM/energy-efficient-resilience.svg?style=social)
 ![GitHub stars](https://img.shields.io/github/stars/IBM/energy-efficient-resilience.svg?style=social)
 ![GitHub watchers](https://img.shields.io/github/watchers/IBM/energy-efficient-resilience.svg?style=social)
-![GitHub license](https://img.shields.io/github/license/IBM/energy-efficient-resilience.svg?style=solcial)
 
 Required commands
 -----------------

@@ -19,5 +19,6 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which black 2> /dev/null)" != "" ]; then
+    # shellcheck disable=SC2010,SC2035,SC2046
     black -l 79 $(ls ./*.py */*.py */*/*.py 2> /dev/null | grep -v ^venv)
 fi

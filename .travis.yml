@@ -1,0 +1,25 @@
+language: python
+python:
+    - 3.6
+    - 3.7
+    - 3.8
+    - 3.9
+os:
+    - linux
+cache:
+    apt: true
+    pip: true
+    timeout: 1000
+dist: bionic
+git:
+    submodules: false
+addons:
+    apt:
+        packages:
+            - shellcheck
+script:
+  - set -e
+  - pip3 install -U -r requirements_devel.txt
+  - set -e
+  - pip3 install -U -r requirements_devel.txt
+  - true

@@ -57,6 +57,7 @@ pip3 install -U $(pip3 list | grep "\." | cut -d " " -f 1)
 pip3 install -U $(pip3 list | grep "\." | cut -d " " -f 1)
 # shellcheck disable=SC2046
 pip3 install -U $(pip3 list | grep "\." | cut -d " " -f 1)
+pre-commit install
 
 {
     echo "echo EERAI environment activated"

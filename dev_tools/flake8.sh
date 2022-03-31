@@ -19,5 +19,6 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which flake8 2> /dev/null)" != "" ]; then
+    # shellcheck disable=SC2010,SC2035,SC2046
     flake8 --max-line-length 79 --indent-size 4 --ignore E203,W503 $(ls ./*.py */*.py */*/*.py 2> /dev/null | grep -v ^venv)
 fi

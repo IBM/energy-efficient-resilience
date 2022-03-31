@@ -38,7 +38,7 @@ fi
 set -e
 
 if [ -e "$HOME/scratch" ]; then
-    rm -f "$HOME/scratch/venv-$name"
+    rm -f "$HOME/scratch/venv-$name" "$scriptpath/venv-$name"
     "$venvcmd" "$HOME/scratch/venv-$name" --prompt="(EERAI $name) " --python="$(command -v "python$ver")"
     ln -s "$HOME/scratch/venv-$name" "$scriptpath/venv-$name"
 else

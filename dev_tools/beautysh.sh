@@ -19,5 +19,6 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which beautysh 2> /dev/null)" != "" ]; then
+    # shellcheck disable=SC2010,SC2035,SC2046
     beautysh -i 4 --force-function-style paronly $(ls ./*.sh */*.sh */*/*.sh 2> /dev/null | grep -v ^venv)
 fi

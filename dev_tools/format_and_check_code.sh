@@ -19,6 +19,7 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which shellcheck 2> /dev/null)" != "" ]; then
+    # shellcheck disable=SC2010,SC2035,SC2046
     shellcheck -x -s sh $(ls ./*.sh */*.sh */*/*.sh 2> /dev/null | grep -v ^venv)
 fi
 

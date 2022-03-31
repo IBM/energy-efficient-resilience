@@ -3,11 +3,18 @@ EERAI - Energy Efficient & Resilient AI
 
 Training AI models to jointly optimize energy efficiency and resilience.
 
+[![Build Status](https://app.travis-ci.com/IBM/energy-efficient-resilience.svg?branch=main)](https://app.travis-ci.com/IBM/energy-efficient-resilience)
+![GitHub](https://img.shields.io/github/license/IBM/energy-efficient-resilience.svg)
+
+![GitHub forks](https://img.shields.io/github/forks/IBM/energy-efficient-resilience.svg?style=social)
+![GitHub stars](https://img.shields.io/github/stars/IBM/energy-efficient-resilience.svg?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/IBM/energy-efficient-resilience.svg?style=social)
+
 Required commands
 -----------------
 
 * git
-* python (3.6 tested)
+* python (3.6, 3.7, 3.8, 3.9)
 * virtualenv: https://virtualenv.pypa.io/en/stable/
 
 First-time set up
@@ -50,18 +57,30 @@ command you need to execute before starting the experiments.
 Example
 -------
 
-To run an 8-bit model with error injection at the rate of 0.01:
+Check and edit the `config.py` for configuration options. Main options
+of interest are the paths where all the data is going to be stored
+(make sure you have enough space to avoid issues) as well as the
+default layers to inject errors.
+
+First one need to train the model:
 
 ```bash
-zs_main.py resnet18 eval cifar10 -ber 0.01
+zs_main.py resnet18 train cifar10 -E 10
 ```
 
-Check and edit if needed config.py for configuration options.
+The previous command will train the model for 10 epochs. Checkpoints
+of each epoch will be stored in the configured paths. Then, one can
+evaluate the model with:
+
+```bash
+zs_main.py resnet18 eval cifar10 -E 10
+```
 
 Contacts
 --------
-Nandhini Chandramoorthy <Nandhini.Chandramoorthy@ibm.com>
-Ramon Bertran <rbertra@us.ibm.com>
+
+- Nandhini Chandramoorthy <Nandhini.Chandramoorthy@ibm.com>
+- Ramon Bertran <rbertra@us.ibm.com>
 
 [^1]:
     Note that the installation of pytorch and other dependencies migth require

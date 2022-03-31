@@ -19,6 +19,8 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which isort 2> /dev/null)" != "" ]; then
+    # shellcheck disable=SC2010,SC2035,SC2046
     isort $(ls ./*.py */*.py */*/*.py 2> /dev/null | grep -v ^venv)
+    # shellcheck disable=SC2010,SC2035,SC2046
     isort $(ls ./*.py */*.py */*/*.py 2> /dev/null | grep -v ^venv)
 fi

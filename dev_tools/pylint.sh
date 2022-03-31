@@ -19,5 +19,6 @@
 set -e # Finish right after a non-zero return command
 
 if [ "$(which pylint 2> /dev/null)" != "" ]; then
+    # shellcheck disable=SC2010,SC2035,SC2046
     pylint --generated-members numpy.*,torch.* --disable C --disable W,R,similarities $(ls ./*.py */*.py */*/*.py | grep -v ^venv)
 fi

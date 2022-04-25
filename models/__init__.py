@@ -45,7 +45,7 @@ def init_models(arch, in_channels, precision, retrain, checkpoint_path):
     else:
         model = lenetf(in_channels, 10, precision, 0, 0, 0, 0, [])
 
-    print(model)
+    # print(model)
     checkpoint_epoch = -1
 
     if retrain:
@@ -59,13 +59,13 @@ def init_models(arch, in_channels, precision, retrain, checkpoint_path):
             print("Checkpoint path not exists")
             return model, checkpoint_epoch
 
-        print("Restoring model from checkpoint", checkpoint_path)
+        # print("Restoring model from checkpoint", checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
 
         model.load_state_dict(checkpoint["model_state_dict"])
-        print("restored checkpoint at epoch - ", checkpoint["epoch"])
-        print("Training loss =", checkpoint["loss"])
-        print("Training accuracy =", checkpoint["accuracy"])
+        # print("restored checkpoint at epoch - ", checkpoint["epoch"])
+        # print("Training loss =", checkpoint["loss"])
+        # print("Training accuracy =", checkpoint["accuracy"])
         checkpoint_epoch = checkpoint["epoch"]
 
     return model, checkpoint_epoch
@@ -163,7 +163,7 @@ def init_models_faulty(
                 faulty_layers,
             )
 
-    print(model)
+    # print(model)
     checkpoint_epoch = -1
 
     if retrain:
@@ -177,13 +177,13 @@ def init_models_faulty(
             print("Checkpoint path not exists")
             return model, checkpoint_epoch
 
-        print("Restoring model from checkpoint", checkpoint_path)
+        # print("Restoring model from checkpoint", checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
 
         model.load_state_dict(checkpoint["model_state_dict"])
-        print("restored checkpoint at epoch - ", checkpoint["epoch"])
-        print("Training loss =", checkpoint["loss"])
-        print("Training accuracy =", checkpoint["accuracy"])
+        # print("restored checkpoint at epoch - ", checkpoint["epoch"])
+        # print("Training loss =", checkpoint["loss"])
+        # print("Training accuracy =", checkpoint["accuracy"])
         checkpoint_epoch = checkpoint["epoch"]
 
     return model, checkpoint_epoch
@@ -204,14 +204,14 @@ def init_models_pairs(
     """Load the default model as well as the corresponding perturbed model"""
 
     model, checkpoint_epoch = init_models(
-        arch, in_channels, precision, retrain, checkpoint_path[0]
+        arch, in_channels, precision, retrain, checkpoint_path
     )
     model_p, checkpoint_epoch_p = init_models_faulty(
         arch,
         in_channels,
         precision,
         retrain,
-        checkpoint_path[1],
+        checkpoint_path,
         faulty_layers,
         bit_error_rate,
         position,

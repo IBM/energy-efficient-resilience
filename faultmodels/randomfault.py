@@ -39,10 +39,10 @@ class RandomFaultModel:
         self.precision = prec
         self.MEM_ROWS = RandomFaultModel.MEM_ROWS
         self.MEM_COLS = RandomFaultModel.MEM_COLS
-        print(
-            "Bit Error Rate %.3f Precision %d Position %d"
-            % (self.ber, self.precision, pos)
-        )
+        #print(
+        #    "Bit Error Rate %.3f Precision %d Position %d"
+        #    % (self.ber, self.precision, pos)
+        #)
         if pos == -1:
             # self.BitErrorMap_flip0, self.BitErrorMap_flip1 =
             # self.ReadBitErrorMap()
@@ -83,8 +83,8 @@ class RandomFaultModel:
         # print(bitmap_flip0)
         # print(bitmap_flip1)
         bitcells = self.MEM_ROWS * self.MEM_COLS
-        print("Read 0 Bit Error Rate", sum(sum(bitmap_flip0)) / bitcells)
-        print("Read 1 Bit Error Rate", sum(sum(bitmap_flip1)) / bitcells)
+        # print("Read 0 Bit Error Rate", sum(sum(bitmap_flip0)) / bitcells)
+        # print("Read 1 Bit Error Rate", sum(sum(bitmap_flip1)) / bitcells)
         return bitmap_flip0, bitmap_flip1
 
     def GenBitPositionErrorMap(self, pos):

@@ -25,6 +25,7 @@ import torchvision.transforms as transforms
 import zs_test as test
 import zs_train as train
 import zs_train_input_transform as transform
+import zs_train_input_transform_eopm as transform_eopm
 from config import cfg
 from models import default_base_model_path
 
@@ -48,7 +49,7 @@ def main():
         "mode",
         help="Specify operation to perform",
         default="eval",
-        choices=["train", "transform", "eval"],
+        choices=["train", "transform", "transform_eopm", "eval"],
     )
     parser.add_argument(
         "dataset",
@@ -111,6 +112,13 @@ def main():
         default=5,
     )
     group.add_argument(
+        "-LM",
+        "--lambdaVal",
+        type=int,
+        help="Lambda value between two loss function",
+        default=1,
+    )
+    group.add_argument(
         "-BS",
         "--batch-size",
         type=int,
@@ -124,11 +132,20 @@ def main():
         help="Test batch size.",
         default=100,
     )
+    group.add_argument(
+        "-N",
+        "--N_perturbed_model",
+        type=int,
+        help="How many perturbed model will be used for training.",
+        default=100,
+    )
 
     args = parser.parse_args()
     cfg.epochs = args.epochs
     cfg.batch_size = args.batch_size
     cfg.test_batch_size = args.test_batch_size
+    cfg.lb = args.lambdaVal
+    cfg.N = args.N_perturbed_model
 
     if not os.path.exists(cfg.save_dir):
         os.makedirs(cfg.save_dir)
@@ -311,6 +328,22 @@ def main():
     elif args.mode == "transform":
         print("input_transform_train", args)
         transform.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_eopm":
+        print("input_transform_train_eopm", args)
+        transform_eopm.transform_train(
             trainloader,
             testloader,
             args.arch,

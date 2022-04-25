@@ -29,7 +29,7 @@ cfg.data_dir = (
     "/home/haolun/dataset"
 )
 cfg.save_dir = (
-    "model_path"
+    "parameter_path"
 )
 
 cfg.temperature = 1

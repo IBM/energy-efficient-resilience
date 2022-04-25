@@ -20,16 +20,16 @@ cfg.faulty_layers = []
 # cfg.faulty_layers = ['linear']
 cfg.faulty_layers = ["linear", "conv"]
 
-cfg.batch_size = 128
+cfg.batch_size = 512
 cfg.test_batch_size = 100
-cfg.epochs = 5
+cfg.epochs = 2
 cfg.precision = 8
 
 cfg.data_dir = (
-    "/gpfs/u/scratch/RAIM/RAIMrmnb/energy-efficient-resilience-data-dir"
+    "/home/haolun/dataset"
 )
 cfg.save_dir = (
-    "/gpfs/u/barn/RAIM/RAIMrmnb/energy-efficient-resilience-work-dir"
+    "model_path"
 )
 
 cfg.temperature = 1
@@ -45,6 +45,8 @@ cfg.flow_lr = 2e-3
 cfg.decay = 0.96
 cfg.max_epoch = 1
 cfg.lb = 1
+
+cfg.N = 100
 cfg.seed = 0
 
 cfg.device = None

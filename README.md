@@ -76,6 +76,12 @@ evaluate the model with:
 zs_main.py resnet18 eval cifar10 -E 10
 ```
 
+For input transformation training, one can excute the Expectation Over Perturbed Model (EOPM) to train the parameter. For LM: the lambda value between clean loss and perturbed loss. For N: how many perturbed model will be used to during training:
+
+```bash
+python zs_main.py resnet18 transform_eopm cifar10 -ber 0.01 -cp model_weights/resnet18_checkpoints_newresnet18_cifar10_p_8_model_100.pth -E 2 -BS 512 -LM 1 -N 100
+```
+
 Contacts
 --------
 

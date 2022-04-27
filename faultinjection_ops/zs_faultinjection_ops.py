@@ -31,7 +31,7 @@ from torch.nn.modules.utils import _pair
 
 # from torch.nn.modules.utils import _single
 
-
+debug = False
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 dtype = torch.float32
 
@@ -83,6 +83,10 @@ class FaultInject(torch.autograd.Function):
         """
         input_dq = input_qor * delta
         input_dq = input_dq.to(torch.float32)
+
+        """ For symmetric quantization, it is possible for dequantized tensors to get out of range compared to the original model"""
+
+        input_dq_clamped = torch.clamp(input_dq, torch.min(input), torch.max(input))
 
         # Return the perturbed-dequantized weights tensor.
         # We want to perturb the weights just for one time.
@@ -145,6 +149,9 @@ class nnLinearPerturbWeight(nn.Linear):
                 BitErrorMap0to1,
                 BitErrorMap1to0,
             )
+        if debug:
+            print(torch.min(self.weight).detach().cpu().numpy(), torch.max(self.weight).detach().cpu().numpy())
+            print(torch.min(perturbed_weights).detach().cpu().numpy(), torch.max(perturbed_weights).detach().cpu().numpy())
         return F.linear(input, perturbed_weights, self.bias)
 
     def extra_repr(self) -> str:
@@ -277,6 +284,9 @@ class nnConv2dPerturbWeight(nn.Conv2d):
                 BitErrorMap0to1,
                 BitErrorMap1to0,
             )
+        if debug:
+            print(torch.min(self.weight).detach().cpu().numpy(), torch.max(self.weight).detach().cpu().numpy())
+            print(torch.min(perturbed_weights).detach().cpu().numpy(), torch.max(perturbed_weights).detach().cpu().numpy())
         return F.conv2d(
             input,
             perturbed_weights,

@@ -20,7 +20,7 @@ import torch.optim as optim
 from torch import nn
 
 from config import cfg
-from models import default_model_path, init_models_faulty
+from models import default_model_path, init_models_faulty, init_models
 
 __all__ = ["training"]
 
@@ -57,9 +57,7 @@ def training(
     :param device: A string. Specify using GPU or CPU.
     """
 
-    model, checkpoint_epoch = init_models_faulty(
-        arch, in_channels, precision, retrain, checkpoint_path, fl, ber, pos
-    )
+    model, checkpoint_epoch = init_models(arch, 3, precision, retrain, checkpoint_path) # Quantization Aware Training without using bit error!
 
     print("Training with Learning rate %.4f" % (cfg.learning_rate))
     opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9)
@@ -138,10 +136,10 @@ def training(
                 x, running_loss / len(trainloader.dataset), accuracy
             )
         )
-        if True:
+        if (x+1)%10 == 0:
 
             model_path = default_model_path(
-                cfg.data_dir, arch, dataset, precision, fl, ber, pos, x
+                cfg.model_dir, arch, dataset, precision, fl, ber, pos, x
             )
 
             if not os.path.exists(os.path.dirname(model_path)):

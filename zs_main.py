@@ -26,6 +26,9 @@ import zs_test as test
 import zs_train as train
 import zs_train_input_transform as transform
 import zs_train_input_transform_eopm as transform_eopm
+import zs_train_input_transform_adversarial as transform_adversarial
+import zs_train_input_transform_adversarial_w as transform_adversarial_w
+import zs_train_input_transform_eval as transform_eval
 from config import cfg
 from models import default_base_model_path
 
@@ -49,7 +52,7 @@ def main():
         "mode",
         help="Specify operation to perform",
         default="eval",
-        choices=["train", "transform", "transform_eopm", "eval"],
+        choices=["train", "transform", "transform_eopm", "transform_adversarial", "transform_eval", "eval", "transform_adversarial_w"],
     )
     parser.add_argument(
         "dataset",
@@ -139,6 +142,13 @@ def main():
         help="How many perturbed model will be used for training.",
         default=100,
     )
+    group.add_argument(
+        "-PGD",
+        "--pgd_step",
+        type=int,
+        help="How many pgd steps for training.",
+        default=2,
+    )
 
     args = parser.parse_args()
     cfg.epochs = args.epochs
@@ -146,9 +156,8 @@ def main():
     cfg.test_batch_size = args.test_batch_size
     cfg.lb = args.lambdaVal
     cfg.N = args.N_perturbed_model
+    cfg.PGD_STEP = args.pgd_step
 
-    if not os.path.exists(cfg.save_dir):
-        os.makedirs(cfg.save_dir)
 
     # if args.position>args.precision-1:
     #    print('ERROR: specified bit position for error exceeds the precision')
@@ -343,7 +352,61 @@ def main():
         )
     elif args.mode == "transform_eopm":
         print("input_transform_train_eopm", args)
+        cfg.save_dir = 'eopm_p/'
+        cfg.save_dir_curve = 'eopm_curve/'
         transform_eopm.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_adversarial":
+        print("input_transform_train_adversarial", args)
+        cfg.save_dir = 'adversarial_p/'
+        cfg.save_dir_curve = 'adversarial_curve/'
+        transform_adversarial.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_adversarial_w":
+        print("input_transform_train_adversarial_w", args)
+        cfg.save_dir = 'adversarial_p_w/'
+        cfg.save_dir_curve = 'adversarial_curve_w/'
+        transform_adversarial_w.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_eval":
+        print("input_transform_train_eval", args)
+        transform_eval.transform_eval(
             trainloader,
             testloader,
             args.arch,

@@ -28,8 +28,14 @@ cfg.precision = 8
 cfg.data_dir = (
     "/home/haolun/dataset"
 )
+cfg.model_dir = (
+    "model_weights/asymmetric_unsigned/"
+)
 cfg.save_dir = (
-    "parameter_path"
+    "/home/haolun/tmp/"
+)
+cfg.save_dir_curve = (
+    "/home/haolun/tmp_curve/"
 )
 
 cfg.temperature = 1
@@ -45,8 +51,16 @@ cfg.flow_lr = 2e-3
 cfg.decay = 0.96
 cfg.max_epoch = 1
 cfg.lb = 1
-
-cfg.N = 100
+cfg.device = None
 cfg.seed = 0
 
-cfg.device = None
+# For EOPM
+cfg.N = 100
+
+# For transform eval
+cfg.alpha = 1e-3
+cfg.PGD_STEP = 1
+
+# For transform_eval
+cfg.testing_mode = 'random_bit_error' # random_bit_error / adversarial
+cfg.P_PATH = '/home/haolun/IBM-energy-efficient-resilience_refactor/adversarial_p/adversarial_arch_resnet18_LR_a1_p0.001_E_1_PGD_1_ber_0.01_lb_1.pt'

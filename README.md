@@ -82,6 +82,14 @@ For input transformation training, one can excute the Expectation Over Perturbed
 python zs_main.py resnet18 transform_eopm cifar10 -ber 0.01 -cp model_weights/resnet18_checkpoints_newresnet18_cifar10_p_8_model_100.pth -E 2 -BS 512 -LM 1 -N 100
 ```
 
+
+For adversarial weights training, one can excute the command below:
+
+```
+zs_main.py resnet18 transform_adversarial_w cifar10 -ber 0.01 -cp model_weights/resnet18_checkpoints_newresnet18_cifar10_p_8_model_100.pth -E 5 -BS 512 -LM 1 -PGD 1
+
+```
+
 Contacts
 --------
 

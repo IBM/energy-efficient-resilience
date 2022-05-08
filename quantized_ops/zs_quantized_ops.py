@@ -36,7 +36,7 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
 
     # Quantize and dequantize in the forward pass
     @staticmethod
-    def forward(ctx, input, precision, clamp_val, use_max=True):
+    def forward(ctx, input, precision, clamp_val, use_max=True, q_method='symmetric_signed'):
         """
         Quantize and dequantize the model weights.
         The gradients will be applied to origin weights.
@@ -49,30 +49,65 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
         ctx.save_for_backward(input)
         # ctx.mark_dirty(input)
 
-        """
-        Compute quantization step size.
-        Mapping (-max_val, max_val) linearly to (-127,127)
-        """
-        if use_max:
-            max_val = torch.max(torch.abs(input))
-        else:
-            max_val = clamp_val
+        if q_method == 'symmetric_unsigned' or q_method == 'asymmetric_unsigned':
+            """
+                Compute quantization step size.
+                Mapping (min_val, max_val) linearly to (0, 2^m - 1)
+            """
+            if use_max and q_method == 'symmetric_unsigned':
+                max_val = torch.max(torch.abs(input))
+                min_val = -max_val
+                input = torch.clamp(input, min_val, max_val)
+                delta = max_val / (2 ** (precision - 1) - 1)
+                input_q = torch.round((input / delta))
+                input_q = input_q.to(torch.int32) + (2 ** (precision - 1) - 1)
+                """
+                    Dequantize introducing a quantization error in the data
+                """
+                input_dq = (input_q - (2 ** (precision - 1) - 1)) * delta
+                input_dq = input_dq.to(torch.float32)
 
-        delta = max_val / (2 ** (precision - 1) - 1)
-        input_clamped = torch.clamp(input, -max_val, max_val)
-        input_q = torch.round((input_clamped / delta))
-        if precision == 8:
-            input_q = input_q.to(torch.int8)
-        elif precision == 16:
-            input_q = input_q.to(torch.int16)
-        else:
-            input_q = input_q.to(torch.int32)
+            elif not use_max and q_method == 'asymmetric_unsigned':
+                max_val = torch.max(input)
+                min_val = torch.min(input)
+                delta = 1 / (2 ** (precision - 1) - 1)
+                input = (input - min_val) / (max_val - min_val)
+                input = input * 2 - 1 # To -1 ~ 1
+                input_q = torch.round((input / delta))
+                input_q = input_q.to(torch.int32) + (2 ** (precision - 1) - 1)
+                """
+                    Dequantize introducing a quantization error in the data
+                """
+                input_dq = (input_q - (2 ** (precision - 1) - 1)) * delta
+                input_dq = ((input_dq + 1) / 2) * (max_val - min_val) + min_val
+                input_dq = input_dq.to(torch.float32)
+                
 
-        """
-        Dequantize introducing a quantization error in the data
-        """
-        input_dq = input_q * delta
-        input_dq = input_dq.to(torch.float32)
+        elif q_method == 'symmetric_signed':
+            """
+                Compute quantization step size.
+                Mapping (-max_val, max_val) linearly to (-127,127)
+            """
+            if use_max:
+                max_val = torch.max(torch.abs(input))
+            else:
+                max_val = clamp_val
+    
+            delta = max_val / (2 ** (precision - 1) - 1)
+            input_clamped = torch.clamp(input, -max_val, max_val)
+            input_q = torch.round((input_clamped / delta))
+            if precision == 8:
+                input_q = input_q.to(torch.int8)
+            elif precision == 16:
+                input_q = input_q.to(torch.int16)
+            else:
+                input_q = input_q.to(torch.int32)
+    
+            """
+                Dequantize introducing a quantization error in the data
+            """
+            input_dq = input_q * delta
+            input_dq = input_dq.to(torch.float32)
         # Return the dequantized weights tensor.
         # We want to update the original weights(not quantized weights) under
         # quantization aware training.

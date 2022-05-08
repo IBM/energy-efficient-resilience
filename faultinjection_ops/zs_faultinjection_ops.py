@@ -44,8 +44,7 @@ class FaultInject(torch.autograd.Function):
 
     @staticmethod
     def forward(
-        ctx, input, precision, clamp_val, BitErrorMap0to1, BitErrorMap1to0
-    ):
+        ctx, input, precision, clamp_val, BitErrorMap0to1, BitErrorMap1to0, use_max=True, q_method='symmetric_signed'):
         ctx.save_for_backward(input)
         # ctx.mark_dirty(input)
 
@@ -53,36 +52,84 @@ class FaultInject(torch.autograd.Function):
         Compute quantization step size. Mapping (-max_val, max_val)
         linearly to (-127,127)
         """
-        use_max = True  # fix me : Need to add a parameter for this one !
-        if use_max:
-            max_val = torch.max(torch.abs(input))
-        else:
-            max_val = clamp_val
 
-        delta = max_val / (2 ** (precision - 1) - 1)
-        input_clamped = torch.clamp(input, -max_val, max_val)
-        input_q = torch.round((input_clamped / delta))
+        if q_method == 'symmetric_unsigned' or q_method == 'asymmetric_unsigned':
+            """
+                Compute quantization step size.
+                Mapping (min_val, max_val) linearly to (0, 2^m - 1)
+            """
+            if use_max and q_method == 'symmetric_unsigned':
+                max_val = torch.max(torch.abs(input))
+                min_val = -max_val
+                input = torch.clamp(input, min_val, max_val)
+                delta = max_val / (2 ** (precision - 1) - 1)
+                input_q = torch.round((input / delta))
+                input_q = input_q.to(torch.int32) + (2 ** (precision - 1) - 1) # [0, 255] => 0....011111111 for 32 bits
+            elif not use_max and q_method == 'asymmetric_unsigned':
+                max_val = torch.max(input)
+                min_val = torch.min(input)
+                delta = 1 / (2 ** (precision - 1) - 1)
+                input = (input - min_val) / (max_val - min_val)
+                input = input * 2 - 1 # To -1 ~ 1
+                input_q = torch.round((input / delta))
+                input_q = input_q.to(torch.int32) + (2 ** (precision - 1) - 1) # [0, 255] => 0....011111111 for 32 bits
 
-        input_q = input_q.to(torch.int8)
+        elif q_method == 'symmetric_signed':
+            """
+                Compute quantization step size.
+                Mapping (-max_val, max_val) linearly to (-127,127)
+            """
+            # fix me : Need to add a parameter for this one !
+            if use_max:
+                max_val = torch.max(torch.abs(input))
+            else:
+                max_val = clamp_val
+
+            delta = max_val / (2 ** (precision - 1) - 1)
+            input_clamped = torch.clamp(input, -max_val, max_val)
+            input_q = torch.round((input_clamped / delta))
+            input_q = input_q.to(torch.int8)
+
         """
             Inject faults in the quantized weight
             as determined by the bit error map
+            
+            BitErrorMap0, BitErrorMap1 = self.MapWeightsToBitErrors(numWeights)
+            convert to int8, since this becomes uint8 by default
+            after bitwise op with unsigned biterrormaps
+
+            # Note from Lun:
+            Because pytorch is noly support for uint8, so for other precision, we should try to simulate it.
+            What we do is we let input_q be int32, and preserve the last m-bit to be the unsigned integer.
+            (The first 24 bits are still "0" after apply any bit operation below.)
+            We can't convert anything to uint8 here because this will let input_dq become uint8, too!
+
         """
 
-        # BitErrorMap0, BitErrorMap1 = self.MapWeightsToBitErrors(numWeights)
-        # convert to int8, since this becomes uint8 by default
-        # after bitwise op with unsigned biterrormaps
-        input_qand = torch.bitwise_and(BitErrorMap1to0, input_q).to(torch.int8)
-        input_qor = torch.bitwise_or(BitErrorMap0to1, input_qand).to(
-            torch.int8
-        )
+        if q_method == 'symmetric_unsigned' or q_method == 'asymmetric_unsigned':
+            input_qand = torch.bitwise_and(BitErrorMap1to0, input_q)
+            input_qor = torch.bitwise_or(BitErrorMap0to1, input_qand)
+        elif q_method == 'symmetric_signed':
+            input_qand = torch.bitwise_and(BitErrorMap1to0, input_q).to(torch.int8)
+            input_qor = torch.bitwise_or(BitErrorMap0to1, input_qand).to(torch.int8)
+
 
         """
             Dequantize introducing a quantization error in the
             data along with the weight perturbation
         """
-        input_dq = input_qor * delta
-        input_dq = input_dq.to(torch.float32)
+        if q_method == 'symmetric_unsigned':
+            input_dq = (input_qor - (2 ** (precision - 1) - 1)) * delta
+            input_dq = torch.clamp(input_dq, min_val, max_val)
+            input_dq = input_dq.to(torch.float32)
+        elif q_method == 'asymmetric_unsigned':
+            input_dq = (input_qor - (2 ** (precision - 1) - 1)) * delta
+            input_dq = ((input_dq + 1) / 2) * (max_val - min_val) + min_val
+            input_dq = torch.clamp(input_dq, min_val, max_val)
+            input_dq = input_dq.to(torch.float32)
+        elif q_method == 'symmetric_signed':
+            input_dq = input_qor * delta
+            input_dq = input_dq.to(torch.float32)
 
         """ For symmetric quantization, it is possible for dequantized tensors to get out of range compared to the original model"""
 

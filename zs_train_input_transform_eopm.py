@@ -19,6 +19,9 @@ from torch.nn.parameter import Parameter
 from config import cfg
 from models import init_models_pairs
 import numpy as np
+import random
+import tqdm
+import copy
 
 torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -26,19 +29,15 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Program(nn.Module):
     """
-    Apply reprogramming.
+      Apply reprogramming.
     """
 
     def __init__(self, cfg):
         super(Program, self).__init__()
         self.cfg = cfg
-        self.num_classes = 10
-
         self.P = None
         self.tanh_fn = torch.nn.Tanh()
         self.init_perturbation()
-
-        # self.temperature = self.cfg.temperature  # not being used yet
 
     # Initialize Perturbation
     def init_perturbation(self):
@@ -49,15 +48,12 @@ class Program(nn.Module):
         x = image.data.clone()
         x_adv = x + self.tanh_fn(self.P)
         x_adv = torch.clamp(x_adv, min=-1, max=1)
-
         return x_adv
 
 
 def compute_loss(model_outputs, labels):
     _, preds = torch.max(model_outputs, 1)
-    labels = labels.view(
-        labels.size(0)
-    )  # changing the size from (batch_size,1) to batch_size.
+    labels = labels.view(labels.size(0))  # changing the size from (batch_size,1) to batch_size.
     loss = nn.CrossEntropyLoss()(model_outputs, labels)
     return loss, preds
 
@@ -135,6 +131,25 @@ def accuracy_checking(
 
     return accuracy_orig_train, accuracy_p_train, accuracy_orig_test, accuracy_p_test
 
+def get_activation_c(act_c, name):
+    def hook(model, input, output):
+        act_c[name] = output.detach()
+    return hook
+
+def get_activation_p(act_p, name):
+    def hook(model, input, output):
+        act_p[name] = output.detach()
+    return hook
+
+def layerwise(act_c, act_p):
+    sumLoss = 0
+    MSE = nn.MSELoss()
+    layer_keys = act_c.keys()
+    for name in layer_keys:
+        #print(MSE(act_c[name], act_p[name]))
+        sumLoss += MSE(act_c[name], act_p[name])
+    return sumLoss
+        
 
 def transform_train(
     trainloader,
@@ -167,61 +182,35 @@ def transform_train(
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
-    (
-        model,
-        checkpoint_epoch,
-        model_perturbed,
-        checkpoint_epoch_perturbed,
-    ) = init_models_pairs(
-        arch,
-        in_channels,
-        precision,
-        True,
-        checkpoint_path,
-        fl,
-        ber,
-        pos,
-        seed=seed,
-    )
-
-    assert checkpoint_epoch == checkpoint_epoch_perturbed
-
     Pg = Program(cfg)
-    model, model_perturbed, Pg = (
-        model.to(device),
-        model_perturbed.to(device),
-        Pg.to(device),
-    )
-
-    model.eval()
-    model_perturbed.eval()
+    Pg = Pg.to(device)
     Pg.train()
 
     # Using Adam:
-    optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, Pg.parameters()),
-        lr=cfg.learning_rate,
-        betas=(0.5, 0.999),
-        weight_decay=5e-4,
-    )
-
-    # Using SGD:
-    #optimizer = torch.optim.SGD(
+    #optimizer = torch.optim.Adam(
     #    filter(lambda p: p.requires_grad, Pg.parameters()),
     #    lr=cfg.learning_rate,
-    #    momentum=0.9, 
-    #    weight_decay=5e-4
+    #    betas=(0.5, 0.999),
+    #    weight_decay=5e-4,
     #)
 
+    # Using SGD:
+    optimizer = torch.optim.SGD(
+        filter(lambda p: p.requires_grad, Pg.parameters()),
+        lr=cfg.learning_rate,
+        momentum=0.9, 
+        #weight_decay=5e-4
+    )
+
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=4, gamma=cfg.decay
+        optimizer, step_size=200, gamma=cfg.decay
     )
     lb = cfg.lb  # Lambda 
 
     for name, param in Pg.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
-    print('========== Check setting: Epoch: {}, Batch_size: {}, N perturbed models: {}, Lambda: {}, BitErrorRate: {} =========='.format(cfg.epochs, cfg.batch_size, cfg.N, lb, ber))
+    print('========== Check setting: Epoch: {}, Batch_size: {}, N perturbed models: {}, Lambda: {}, BitErrorRate: {}, LR: {}=========='.format(cfg.epochs, cfg.batch_size, cfg.N, lb, ber, cfg.learning_rate))
 
 
     print(
@@ -234,24 +223,43 @@ def transform_train(
         running_correct_p = 0
               
         # For each epoch, we will use N perturbed model for training.
-        for batch_id, (image, label) in enumerate(trainloader):
+        for batch_id, (image, label) in tqdm.tqdm(enumerate(trainloader)):
             total_grads = 0  
             image, label = image.to(device), label.to(device)
-            loss = 0
-            for j in range(cfg.N):
+            
+            for k in range(cfg.N):
                 
+                loss = 0
+
                 image_adv = Pg(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
+                image_adv = image_adv.to(device)
                 
-                # print("*** For using the {}-th perturbed model ***".format(j))
-                (model, checkpoint_epoch, model_perturbed, checkpoint_epoch_perturbed) = init_models_pairs( 
-                    arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=j)
-                model, model_perturbed = model.to(device), model_perturbed.to(device)
+                # Random test
+                if cfg.totalRandom:
+                    j = random.randint(0, cfg.randomRange)
+                else:
+                    j = k
+
+                model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=j)
+                model_np = copy.deepcopy(model) # Inference origin images
+                model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
+
+                model_np.eval()
                 model.eval()
                 model_perturbed.eval()
 
+                # Calculate the activate from the clean model and perturbed model
+                activation_c, activation_p = {}, {}
+                for name, layer in model_np.named_modules():
+                    layer.register_forward_hook(get_activation_c(activation_c, name))
+                    
+                for name, layer in model_perturbed.named_modules():
+                    layer.register_forward_hook(get_activation_p(activation_p, name))
+
                 # Inference the clean model and perturbed model
+                _ = model_np(image)
                 out = model(image_adv)  # pylint: disable=E1102
-                out_biterror = model_perturbed(image_adv)  # pylint: disable=E1102
+                out_biterror = model_perturbed(image_adv)  # pylint: disable=E1102                
 
                 # Compute the loss for clean model and perturbed model
                 loss_orig, pred_orig = compute_loss(out, label)
@@ -261,8 +269,14 @@ def transform_train(
                 running_correct_orig += torch.sum(pred_orig == label.data).item()
                 running_correct_p += torch.sum(pred_p == label.data).item()     
             
-                # Calculate the total loss. For easier codding, we inference clean model for each j, but it is still the same objective function of ver2.
-                loss = loss_orig + lb * loss_p
+                # Calculate the total loss. 
+                if cfg.layerwise:
+                    #print(layerwise(activation_c, activation_p))
+                    loss = loss_orig + lb * layerwise(activation_c, activation_p)
+                else:
+                    loss = loss_orig + lb * loss_p
+
+                # Keep the overal loss for whole batches
                 running_loss += loss.item()  
 
                 # Calculate the gradients
@@ -279,7 +293,7 @@ def transform_train(
             for param in Pg.parameters():
                 param.grad = mean_grads
 
-            # Apply gradients by optimizer            
+            # Apply gradients by optimizer to parameter           
             optimizer.step()
             lr_scheduler.step()
             
@@ -313,11 +327,12 @@ def transform_train(
 
     for i in range(50000, 50010):
         print(' ********** For seed: {} ********** '.format(i))
-        (model, checkpoint_epoch, model_perturbed, checkpoint_epoch_perturbed) = init_models_pairs( 
-                    arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=i)
+        model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=i)
         model, model_perturbed = model.to(device), model_perturbed.to(device),
+
         model.eval()
         model_perturbed.eval()
+        Pg.eval()
 
         # Without using transform
         accuracy_orig_train, accuracy_p_train, accuracy_orig_test, accuracy_p_test = accuracy_checking(model, model_perturbed, trainloader, testloader, Pg, device, use_transform=False)

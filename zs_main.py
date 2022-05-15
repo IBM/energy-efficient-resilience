@@ -28,6 +28,7 @@ import zs_train_input_transform as transform
 import zs_train_input_transform_eopm as transform_eopm
 import zs_train_input_transform_adversarial as transform_adversarial
 import zs_train_input_transform_adversarial_w as transform_adversarial_w
+#import zs_train_input_transform_mlp_eopm as transform_mlp_eopm
 import zs_train_input_transform_eval as transform_eval
 from config import cfg
 from models import default_base_model_path
@@ -52,7 +53,7 @@ def main():
         "mode",
         help="Specify operation to perform",
         default="eval",
-        choices=["train", "transform", "transform_eopm", "transform_adversarial", "transform_eval", "eval", "transform_adversarial_w"],
+        choices=["train", "transform", "transform_eopm", "transform_adversarial", "transform_eval", "eval", "transform_adversarial_w", "transform_mlp_eopm"],
     )
     parser.add_argument(
         "dataset",
@@ -115,9 +116,16 @@ def main():
         default=5,
     )
     group.add_argument(
+        "-LR",
+        "--learning_rate",
+        type=float,
+        help="Learning rate for training input transformation of training clean model.",
+        default=5,
+    )
+    group.add_argument(
         "-LM",
         "--lambdaVal",
-        type=int,
+        type=float,
         help="Lambda value between two loss function",
         default=1,
     )
@@ -152,6 +160,7 @@ def main():
 
     args = parser.parse_args()
     cfg.epochs = args.epochs
+    cfg.learning_rate = args.learning_rate
     cfg.batch_size = args.batch_size
     cfg.test_batch_size = args.test_batch_size
     cfg.lb = args.lambdaVal
@@ -391,6 +400,24 @@ def main():
         cfg.save_dir = 'adversarial_p_w/'
         cfg.save_dir_curve = 'adversarial_curve_w/'
         transform_adversarial_w.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_mlp_eopm":
+        print("input_transform_train_mlp_eopm", args)
+        cfg.save_dir = 'mlp_eopm_p_w/'
+        cfg.save_dir_curve = 'mlp_eopm_curve_w/'
+        transform_mlp_eopm.transform_train(
             trainloader,
             testloader,
             args.arch,

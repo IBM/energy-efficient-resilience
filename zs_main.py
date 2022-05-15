@@ -28,7 +28,7 @@ import zs_train_input_transform as transform
 import zs_train_input_transform_eopm as transform_eopm
 import zs_train_input_transform_adversarial as transform_adversarial
 import zs_train_input_transform_adversarial_w as transform_adversarial_w
-#import zs_train_input_transform_mlp_eopm as transform_mlp_eopm
+import zs_train_input_transform_mlp_eopm as transform_mlp_eopm
 import zs_train_input_transform_eval as transform_eval
 from config import cfg
 from models import default_base_model_path

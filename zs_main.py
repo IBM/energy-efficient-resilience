@@ -24,11 +24,12 @@ import torchvision.transforms as transforms
 
 import zs_test as test
 import zs_train as train
-import zs_train_input_transform as transform
+import zs_train_input_transform_single as transform_single
 import zs_train_input_transform_eopm as transform_eopm
-import zs_train_input_transform_adversarial as transform_adversarial
-import zs_train_input_transform_adversarial_w as transform_adversarial_w
 import zs_train_input_transform_mlp_eopm as transform_mlp_eopm
+import zs_train_input_transform_adversarial as transform_adversarial
+import zs_train_input_transform_mlp_adversarial as transform_mlp_adversarial
+import zs_train_input_transform_adversarial_w as transform_adversarial_w
 import zs_train_input_transform_eval as transform_eval
 from config import cfg
 from models import default_base_model_path
@@ -53,7 +54,10 @@ def main():
         "mode",
         help="Specify operation to perform",
         default="eval",
-        choices=["train", "transform", "transform_eopm", "transform_adversarial", "transform_eval", "eval", "transform_adversarial_w", "transform_mlp_eopm"],
+        choices=["train", "eval", "transform_single", "transform_eval",
+                 "transform_eopm", "transform_mlp_eopm",
+                 "transform_adversarial", "transform_mlp_adversarial", "transform_adversarial_w", 
+                ],
     )
     parser.add_argument(
         "dataset",
@@ -343,9 +347,11 @@ def main():
             args.bit_error_rate,
             args.position,
         )
-    elif args.mode == "transform":
-        print("input_transform_train", args)
-        transform.transform_train(
+    elif args.mode == "transform_single":
+        print("input_transform_train_single", args)
+        cfg.save_dir = 'single_p/'
+        cfg.save_dir_curve = 'single_curve/'
+        transform_single.transform_train(
             trainloader,
             testloader,
             args.arch,
@@ -377,6 +383,24 @@ def main():
             args.bit_error_rate,
             args.position,
         )
+    elif args.mode == "transform_mlp_eopm":
+        print("input_transform_train_mlp_eopm", args)
+        cfg.save_dir = 'mlp_eopm_p_w/'
+        cfg.save_dir_curve = 'mlp_eopm_curve_w/'
+        transform_mlp_eopm.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
     elif args.mode == "transform_adversarial":
         print("input_transform_train_adversarial", args)
         cfg.save_dir = 'adversarial_p/'
@@ -395,11 +419,11 @@ def main():
             args.bit_error_rate,
             args.position,
         )
-    elif args.mode == "transform_adversarial_w":
-        print("input_transform_train_adversarial_w", args)
-        cfg.save_dir = 'adversarial_p_w/'
-        cfg.save_dir_curve = 'adversarial_curve_w/'
-        transform_adversarial_w.transform_train(
+    elif args.mode == "transform_mlp_adversarial":
+        print("input_transform_train_mlp_adversarial", args)
+        cfg.save_dir = 'mlp_adversarial_p/'
+        cfg.save_dir_curve = 'mlp_adversarial_curve/'
+        transform_mlp_adversarial.transform_train(
             trainloader,
             testloader,
             args.arch,
@@ -413,11 +437,11 @@ def main():
             args.bit_error_rate,
             args.position,
         )
-    elif args.mode == "transform_mlp_eopm":
-        print("input_transform_train_mlp_eopm", args)
-        cfg.save_dir = 'mlp_eopm_p_w/'
-        cfg.save_dir_curve = 'mlp_eopm_curve_w/'
-        transform_mlp_eopm.transform_train(
+    elif args.mode == "transform_adversarial_w":
+        print("input_transform_train_adversarial_w", args)
+        cfg.save_dir = 'adversarial_p_w/'
+        cfg.save_dir_curve = 'adversarial_curve_w/'
+        transform_adversarial_w.transform_train(
             trainloader,
             testloader,
             args.arch,

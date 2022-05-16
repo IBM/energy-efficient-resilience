@@ -72,15 +72,20 @@ cfg.lb = 1
 cfg.device = None
 cfg.seed = 0
 
+
 # For EOPM
 cfg.N = 100
 cfg.randomRange = 10000
 cfg.totalRandom = True # True: Sample perturbed models in the range cfg.randomRange
 cfg.layerwise = True # True: Layerwise training / False: Normal training
 
-# For transform eval
+# For transform adversarial
 cfg.alpha = 1e-3
 cfg.PGD_STEP = 1
+
+# For transform generalization testing:
+cfg.beginSeed = 50000
+cfg.endSeed = 500010
 
 # For transform_eval
 cfg.testing_mode = 'random_bit_error' # random_bit_error / adversarial

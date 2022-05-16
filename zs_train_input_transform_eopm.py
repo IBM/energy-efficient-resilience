@@ -133,12 +133,12 @@ def accuracy_checking(
 
 def get_activation_c(act_c, name):
     def hook(model, input, output):
-        act_c[name] = output.detach()
+        act_c[name] = output
     return hook
 
 def get_activation_p(act_p, name):
     def hook(model, input, output):
-        act_p[name] = output.detach()
+        act_p[name] = output
     return hook
 
 def layerwise(act_c, act_p):
@@ -325,7 +325,7 @@ def transform_train(
     accuracy_orig_test_list_with_transformation = []
     accuracy_p_test_list_with_transformation = []
 
-    for i in range(50000, 50010):
+    for i in range(cfg.beginSeed, cfg.endSeed):
         print(' ********** For seed: {} ********** '.format(i))
         model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=i)
         model, model_perturbed = model.to(device), model_perturbed.to(device),

@@ -30,34 +30,36 @@ torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 EPS = 1e-20
 
-
 class Program(nn.Module):
     """
-      Apply reprogramming.
+    Apply reprogramming.
     """
 
     def __init__(self, cfg):
         super(Program, self).__init__()
         self.cfg = cfg
-        self.num_classes = 10
-
+        self.dense = nn.Linear(self.cfg.channels*self.cfg.h1*self.cfg.w1, self.cfg.channels*self.cfg.h1*self.cfg.w1)
         self.P = None
+        self.relu = nn.ReLU()
+        self.flatten = nn.Flatten()
         self.tanh_fn = torch.nn.Tanh()
         self.init_perturbation()
+        self.batchnorm = nn.BatchNorm2d(self.cfg.channels)
 
-        # self.temperature = self.cfg.temperature  # not being used yet
-
-    # Initialize Perturbation
     def init_perturbation(self):
         init_p = torch.zeros((self.cfg.channels, self.cfg.h1, self.cfg.w1))
-        self.P = Parameter(init_p, requires_grad=True)
+        self.P = Parameter(init_p, requires_grad=True)    
 
     def forward(self, image):
         x = image.data.clone()
-        x_adv = x + self.tanh_fn(self.P)
-        x_adv = torch.clamp(x_adv, min=-1, max=1)
 
-        return x_adv
+        x_flatten = self.flatten(x)
+        x_mlp = self.dense(x_flatten)
+        x_mlp = torch.reshape(x_mlp, (-1, 3, 32, 32))
+        
+        out = x + self.tanh_fn(self.P) + self.relu(x_mlp)
+        out = torch.clamp(out, min=-1, max=1)
+        return out
 
 def draw_learning_curve(loss_list, epoch, arch, ber, lb):
     epoch_list = [e+1 for e in range(epoch)]
@@ -75,9 +77,12 @@ def check_dir(paths):
 
 def compute_loss(model_outputs, labels):
     _, preds = torch.max(model_outputs, 1)
-    labels = labels.view(labels.size(0))  # changing the size from (batch_size,1) to batch_size.
+    labels = labels.view(
+        labels.size(0)
+    )  # changing the size from (batch_size,1) to batch_size.
     loss = nn.CrossEntropyLoss()(model_outputs, labels)
     return loss, preds
+
 
 def accuracy_checking(
     model_orig, model_p, trainloader, testloader, pg, device, use_transform=False
@@ -181,26 +186,6 @@ def pgd(model_orig, model_p, epsilon, alpha):
             delta = quantization(param_p)
             param_p.data = param_p.data + (alpha * param_p.grad.sign())
             param_p.data = torch.clamp(param_p.data, min=param_orig.data-(epsilon*delta), max=param_orig.data+(epsilon*delta))
-
-# For layerwise training
-def get_activation_c(act_c, name):
-    def hook(model, input, output):
-        act_c[name] = output
-    return hook
-
-def get_activation_p(act_p, name):
-    def hook(model, input, output):
-        act_p[name] = output
-    return hook
-
-def layerwise(act_c, act_p):
-    sumLoss = 0
-    MSE = nn.MSELoss()
-    layer_keys = act_c.keys()
-    for name in layer_keys:
-        #print(MSE(act_c[name], act_p[name]))
-        sumLoss += MSE(act_c[name], act_p[name])
-    return sumLoss
                 
 
 def transform_train(
@@ -259,7 +244,7 @@ def transform_train(
     )
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=200, gamma=cfg.decay
+        optimizer, step_size=500, gamma=cfg.decay
     )
     lb = cfg.lb  # Lambda 
 
@@ -272,7 +257,7 @@ def transform_train(
 
     print("========== Start training the parameter of the input transform by using Adversarial Training ==========")
 
-    (model, _, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0) # Create clean model.
+    (model, checkpoint_epoch, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0) # Create clean model.
     
     EPSILON = ber * 511
 
@@ -299,37 +284,29 @@ def transform_train(
                 Pg.zero_grad()
                 image, label = image.to(device), label.to(device)
                 image_adv = Pg(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
-                image_adv = image_adv.to(device)
                 out_perturb = model_perturbed(image_adv)
                 loss_pgd, pred_pgd = compute_loss(out_perturb, label)
                 loss_pgd.backward()
                 pgd(model, model_perturbed, EPSILON, cfg.alpha)
-                #print(loss_pgd)
+                #print("loss_pgd: {}".format(loss_pgd))
                 #for param_a, param_p in zip(model.parameters(), model_perturbed.parameters()):
                 #    print(param_p - param_a)
 
+            diff_w = diff_in_weight(model, model_perturbed) # Calculate the different between original model and perturbed model.
+  
             #print('------------------------------------------------------')
             # Start to update parameter P
             loss = 0
+            model_perturbed = copy.deepcopy(model)
+            add_into_weights(model_perturbed, diff_w)
+            model, model_perturbed = model.to(device), model_perturbed.to(device)
+
             image, label = image.to(device), label.to(device)
             image_adv = Pg(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
-            image_adv = image_adv.to(device)
-
-            model_np = copy.deepcopy(model) # Inference origin images
-            model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
-            model_np.eval()
+            
             model.eval()
             model_perturbed.eval()
-
-            # Calculate the activate from the clean model and perturbed model
-            activation_c, activation_p = {}, {}
-            for name, layer in model_np.named_modules():
-                layer.register_forward_hook(get_activation_c(activation_c, name))
-                
-            for name, layer in model_perturbed.named_modules():
-                layer.register_forward_hook(get_activation_p(activation_p, name))
-
-            _, out, out_perturb = model_np(image), model(image_adv), model_perturbed(image_adv)
+            out, out_perturb = model(image_adv), model_perturbed(image_adv)
             # Compute the loss for clean model and perturbed model
             loss_orig, pred_orig = compute_loss(out, label)   
             loss_perturb, pred_perturb = compute_loss(out_perturb, label)            
@@ -338,21 +315,20 @@ def transform_train(
             running_correct_orig += torch.sum(pred_orig == label.data).item()
             running_correct_p += torch.sum(pred_perturb == label.data).item() 
         
-            # Calculate the total loss. 
-            if cfg.layerwise:
-                #print(layerwise(activation_c, activation_p))
-                loss = loss_orig + lb * layerwise(activation_c, activation_p)
-            else:
-                loss = loss_orig + lb * loss_perturb
-
+            # Calculate the total loss. For easier codding, we inference clean model for each j, but it is still the same objective function of ver2.
+            loss = loss_orig + lb * loss_perturb # apply gradients descent (Solving minimization problem)
+            
+            #print("loss: {}".format(loss))
             running_loss += loss.item()
+
             # Apply gradients by optimizer            
             optimizer.zero_grad()
             loss.backward()
+
             optimizer.step()
             lr_scheduler.step()
 
-        # learning_curve_loss.append(running_loss) 
+        learning_curve_loss.append(running_loss) 
 
         # Keep the running accuracy of clean model and perturbed model for all mini-batch.
         accuracy_orig = running_correct_orig / (len(trainloader.dataset))
@@ -369,9 +345,7 @@ def transform_train(
 
     # draw_learning_curve(learning_curve_loss, cfg.epochs, arch, ber, lb)
 
-
     # -------------------------------------------------- Inference --------------------------------------------------
-
 
     print('========== Start checking the accuracy with different perturbed model: Adversarial bit error mode ==========')
 

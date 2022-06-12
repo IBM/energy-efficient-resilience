@@ -18,8 +18,11 @@ from torch.nn.parameter import Parameter
 
 from config import cfg
 from models import init_models_pairs
+import matplotlib.pyplot as plt
 import numpy as np
+import itertools
 import copy
+import tqdm
 
 torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -46,8 +49,9 @@ class Program(nn.Module):
 
     def forward(self, image):
         x = image.data.clone()
-        x_adv = x + self.tanh_fn(self.P)
-        x_adv = torch.clamp(x_adv, min=-1, max=1)
+        # x_adv = x + self.tanh_fn(self.P)
+        # x_adv = torch.clamp(x_adv, min=-1, max=1)
+        x_adv = torch.tanh(0.5 * (torch.log(1 + x + 1e-15) - torch.log(1 - x + 1e-15)) + self.P)
         return x_adv
 
 
@@ -131,6 +135,31 @@ def get_activation_p(act_p, name):
         act_p[name] = output
     return hook
 
+def calActivationDiff(actCdict, actPdict, actdict, act_c, act_p):
+    layer_keys = act_c.keys()
+    for name in layer_keys:
+        #print(act_c[name].shape)
+        cleanAct = torch.linalg.norm(torch.reshape(act_c[name], (act_c[name].shape[0], -1)), dim=1, ord=2)
+        perturbedAct = torch.linalg.norm(torch.reshape(act_p[name], (act_p[name].shape[0], -1)), dim=1, ord=2)
+        diff_norm = torch.linalg.norm(torch.reshape(act_c[name]-act_p[name], (act_c[name].shape[0], -1)), dim=1, ord=2)
+        # print(torch.abs(cleanAct-perturbedAct).shape)
+        actdict[name].append(diff_norm.data.cpu())
+        actCdict[name].append(cleanAct.data.cpu())
+        actPdict[name].append(perturbedAct.data.cpu())
+        # print(diff.data)
+
+def calOutputDiff(outClean, outPerturbed, outDiff, outputNp, outputP):
+
+    #print(act_c[name].shape)
+    cleanOut = torch.linalg.norm(torch.reshape(outputNp, (outputNp.shape[0], -1)), dim=1, ord=2)
+    perturbedOut = torch.linalg.norm(torch.reshape(outputP, (outputP.shape[0], -1)), dim=1, ord=2)
+    diff_norm = torch.linalg.norm(torch.reshape(outputNp-outputP, (outputNp.shape[0], -1)), dim=1, ord=2)
+    # print(torch.abs(cleanAct-perturbedAct).shape)
+    outDiff.append(diff_norm.data.cpu())
+    outClean.append(cleanOut.data.cpu())
+    outPerturbed.append(perturbedOut.data.cpu())
+    # print(diff.data)
+
 def layerwise(act_c, act_p):
     sumLoss = 0
     MSE = nn.MSELoss()
@@ -139,6 +168,86 @@ def layerwise(act_c, act_p):
         #print(MSE(act_c[name], act_p[name]))
         sumLoss += MSE(act_c[name], act_p[name])
     return sumLoss
+
+def checkActivationDistribution(model_np_origin, model_p, trainDataLoader, pg, act_c, act_p, act_diff, act_clean, act_perturbed, epoch):
+
+    print('Calculating activation values')
+
+    model_np_origin.eval()
+    model_p.eval()
+    pg.eval()
+    for batch_id, (image, label) in tqdm.tqdm(enumerate(trainDataLoader)):
+        image, label = image.to(device), label.to(device)
+        image_adv = pg(image)  # pylint: disable=E1102
+        image_adv = image_adv.to(device)
+        
+        _, _ = model_np_origin(image), model_p(image_adv)
+        calActivationDiff(act_clean, act_perturbed, act_diff, act_c, act_p) 
+
+    for name, layer in model_np_origin.named_modules():
+        if 'relu' in name:
+            # Draw learning curve:
+            # print(len(list(itertools.chain(*act_diff[name]))))
+            reshapeActList = list(itertools.chain(*act_diff[name]))
+            reshapeActList = [act.item() for act in reshapeActList]
+
+            reshapeActCleanList = list(itertools.chain(*act_clean[name]))
+            reshapeActCleanList = [act.item() for act in reshapeActCleanList]
+
+            reshapeActPerturbedList = list(itertools.chain(*act_perturbed[name]))
+            reshapeActPerturbedList = [act.item() for act in reshapeActPerturbedList]
+
+            plt.hist(reshapeActList, color = 'green')
+            # plt.hist(reshapeActList, bins=np.arange(min(reshapeActList), max(reshapeActList) + 10, 10), color = "skyblue", ec="skyblue")
+            plt.title('L2 norm different between clean / perturbed model: {}'.format(name))
+            plt.savefig(cfg.save_dir + 'NormDiff_Layer_{}_Epoch_{}.jpg'.format(name, epoch+1))
+            plt.clf()
+
+            plt.hist(reshapeActCleanList, color = 'blue')
+            plt.hist(reshapeActPerturbedList, color = 'red')
+            plt.legend(['Clean model', 'Perturbed model'])
+            # plt.hist(reshapeActList, bins=np.arange(min(reshapeActList), max(reshapeActList) + 10, 10), color = "skyblue", ec="skyblue")
+            plt.title('Activation distribution: {}'.format(name))
+            plt.savefig(cfg.save_dir + 'Distribution_Layer_{}_Epoch_{}.jpg'.format(name, epoch+1))
+            plt.clf()
+
+def checkOutputDistribution(model_np_origin, model_p, trainDataLoader, pg, out_diff, out_clean, out_perturbed, epoch):
+
+    print('Calculating output values')
+
+    model_np_origin.eval()
+    model_p.eval()
+    pg.eval()
+    for batch_id, (image, label) in tqdm.tqdm(enumerate(trainDataLoader)):
+        image, label = image.to(device), label.to(device)
+        image_adv = pg(image)  # pylint: disable=E1102
+        image_adv = image_adv.to(device)
+        
+        output_np, output_p = model_np_origin(image), model_p(image_adv)
+        calOutputDiff(out_clean, out_perturbed, out_diff, output_np, output_p) 
+
+
+    # Draw learning curve:
+    # print(len(list(itertools.chain(*act_diff[name]))))
+    reshapeOutputList = list(itertools.chain(*out_diff))
+    reshapeOutputList = [out.item() for out in reshapeOutputList]
+    reshapeOutputCleanList = list(itertools.chain(*out_clean))
+    reshapeOutputCleanList = [out.item() for out in reshapeOutputCleanList]
+    reshapeOutputPerturbedList = list(itertools.chain(*out_perturbed))
+    reshapeOutputPerturbedList = [out.item() for out in reshapeOutputPerturbedList]
+    plt.hist(reshapeOutputList, color = 'green')
+    # plt.hist(reshapeActList, bins=np.arange(min(reshapeActList), max(reshapeActList) + 10, 10), color = "skyblue", ec="skyblue")
+    plt.title('L2 norm different between clean / perturbed model')
+    plt.savefig(cfg.save_dir + 'OutputNormDiff_Epoch_{}.jpg'.format(epoch))
+    plt.clf()
+
+    plt.hist(reshapeOutputCleanList, color = 'blue')
+    plt.hist(reshapeOutputPerturbedList, color = 'red')
+    plt.legend(['Clean model', 'Perturbed model'])
+    # plt.hist(reshapeActList, bins=np.arange(min(reshapeActList), max(reshapeActList) + 10, 10), color = "skyblue", ec="skyblue")
+    plt.title('Output distribution')
+    plt.savefig(cfg.save_dir + 'OutputDistribution_Epoch_{}.jpg'.format(epoch))
+    plt.clf()
 
 def transform_train(
     trainloader,
@@ -188,6 +297,10 @@ def transform_train(
         seed=seed,
     )
 
+    print('Seed: {}'.format(seed))
+
+    storeLoss = []
+
     model_np = copy.deepcopy(model) # Inference origin images
 
     Pg = Program(cfg)
@@ -226,14 +339,45 @@ def transform_train(
     )
 
     model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
+    # Calculate the activate from the clean model and perturbed model
+    activation_c, activation_p = {}, {}
+    for name, layer in model_np.named_modules():
+        if 'relu' in name:
+            layer.register_forward_hook(get_activation_c(activation_c, name))
+        
+    for name, layer in model_perturbed.named_modules():
+        if 'relu' in name:
+            layer.register_forward_hook(get_activation_p(activation_p, name))
 
+    activationDiffDict = {}
+    activationCleanDict = {}
+    activationPerturbedDict = {}
+    
     for epoch in range(cfg.epochs):
         running_loss = 0
         running_correct_orig = 0
         running_correct_p = 0
+
+        # Reset the list for storing the activation:
+        for name, layer in model_np.named_modules():
+            if 'relu' in name:
+                activationDiffDict[name] = []
+                activationCleanDict[name] = []
+                activationPerturbedDict[name] = []
+        
+        # Reset the list for the output distribution
+        outputDiffList = []
+        outputCleanList = []
+        outputPerturbedList = []
+
+        if epoch % 2 == 0:
+            checkActivationDistribution(model_np, model_perturbed, trainloader, Pg, activation_c, activation_p, activationDiffDict, activationCleanDict, activationPerturbedDict, epoch)
+            # checkOutputDistribution(model_np, model_perturbed, trainloader, Pg, outputDiffList, outputCleanList, outputPerturbedList, epoch)
+
+        Pg.train()
               
         # For each epoch, we will use N perturbed model for training.
-        for batch_id, (image, label) in enumerate(trainloader):
+        for batch_id, (image, label) in tqdm.tqdm(enumerate(trainloader)):
             total_loss = 0  
             image, label = image.to(device), label.to(device)
             image_adv = Pg(image)  # pylint: disable=E1102
@@ -242,14 +386,6 @@ def transform_train(
             model_np.eval()
             model.eval()
             model_perturbed.eval()
-
-            # Calculate the activate from the clean model and perturbed model
-            activation_c, activation_p = {}, {}
-            for name, layer in model_np.named_modules():
-                layer.register_forward_hook(get_activation_c(activation_c, name))
-                
-            for name, layer in model_perturbed.named_modules():
-                layer.register_forward_hook(get_activation_p(activation_p, name))
 
             _, out, out_biterror = model_np(image), model(image_adv), model_perturbed(image_adv)  # pylint: disable=E1102
 
@@ -262,7 +398,7 @@ def transform_train(
             # Calculate the total loss. 
             if cfg.layerwise:
                 #print(layerwise(activation_c, activation_c))
-                loss = loss_orig + lb * layerwise(activation_c, activation_p)
+                loss = loss_orig + lb * (loss_p + layerwise(activation_c, activation_p))
             else:
                 loss = loss_orig + lb * loss_p
 
@@ -272,7 +408,7 @@ def transform_train(
             loss.backward()
 
             optimizer.step()
-            lr_scheduler.step()            
+            lr_scheduler.step()        
 
         accuracy_orig = running_correct_orig / len(trainloader.dataset)
         accuracy_p = running_correct_p / (len(trainloader.dataset))
@@ -286,6 +422,29 @@ def transform_train(
             )
         )
 
+        storeLoss.append(running_loss / cfg.N)
+
+    # For the final testing!
+    # Reset the list for storing the activation:
+    for name, layer in model_np.named_modules():
+        if 'relu' in name:
+            activationDiffDict[name] = []
+            activationCleanDict[name] = []
+            activationPerturbedDict[name] = []
+
+    checkActivationDistribution(model_np, model_perturbed, trainloader, Pg, activation_c, activation_p, activationDiffDict, activationCleanDict, activationPerturbedDict, cfg.epochs)
+
+    # Reset the list for the output distribution
+    outputDiffList = []
+    outputCleanList = []
+    outputPerturbedList = []
+
+    # checkOutputDistribution(model_np, model_perturbed, trainloader, Pg, outputDiffList, outputCleanList, outputPerturbedList, cfg.epochs)
+
+    # Draw learning curve:
+    plt.plot([e+1 for e in range(cfg.epochs)], storeLoss)
+    plt.title('Learning Curve')
+    plt.savefig(cfg.save_dir + 'Learning_Curve.jpg')
 
     print('========== Start checking the accuracy with different perturbed model ==========')
 

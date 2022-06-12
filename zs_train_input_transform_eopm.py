@@ -18,6 +18,7 @@ from torch.nn.parameter import Parameter
 
 from config import cfg
 from models import init_models_pairs
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 import tqdm
@@ -37,17 +38,25 @@ class Program(nn.Module):
         self.cfg = cfg
         self.P = None
         self.tanh_fn = torch.nn.Tanh()
+        self.dropout = nn.Dropout(p=0.2)
         self.init_perturbation()
 
     # Initialize Perturbation
     def init_perturbation(self):
         init_p = torch.zeros((self.cfg.channels, self.cfg.h1, self.cfg.w1))
         self.P = Parameter(init_p, requires_grad=True)
+        # self.P = torch.nn.init.xavier_uniform_(Parameter(init_p, requires_grad=True))
+        # self.P = torch.nn.init.uniform_(Parameter(init_p, requires_grad=True), a=-1.0, b=1.0)
+        # self.P = Parameter(torch.nn.init.kaiming_uniform_(init_p), requires_grad=True)
 
     def forward(self, image):
         x = image.data.clone()
-        x_adv = x + self.tanh_fn(self.P)
-        x_adv = torch.clamp(x_adv, min=-1, max=1)
+        # x_adv = x + self.tanh_fn(self.P)
+        # x_adv = x + torch.clamp(self.P, min=-1, max=1)
+        # x_adv = torch.clamp(x_adv, min=-1, max=1)
+        # x_adv = x + torch.clamp(self.dropout(self.P), min=-1, max=1)
+        # x_adv = torch.clamp(x_adv, min=-1, max=1)
+        x_adv = torch.tanh(0.5 * (torch.log(1 + x + 1e-15) - torch.log(1 - x + 1e-15)) + self.dropout(self.P))
         return x_adv
 
 
@@ -149,7 +158,10 @@ def layerwise(act_c, act_p):
         #print(MSE(act_c[name], act_p[name]))
         sumLoss += MSE(act_c[name], act_p[name])
     return sumLoss
-        
+ 
+def imgMSE(img_o, img_p):
+    MSE = nn.MSELoss()
+    print("Image MSE: {}".format(MSE(img_o, img_p)))
 
 def transform_train(
     trainloader,
@@ -182,6 +194,8 @@ def transform_train(
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
+    storeLoss = []
+
     Pg = Program(cfg)
     Pg = Pg.to(device)
     Pg.train()
@@ -199,7 +213,7 @@ def transform_train(
         filter(lambda p: p.requires_grad, Pg.parameters()),
         lr=cfg.learning_rate,
         momentum=0.9, 
-        #weight_decay=5e-4
+        # weight_decay=1e-4,
     )
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
@@ -211,16 +225,19 @@ def transform_train(
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
     print('========== Check setting: Epoch: {}, Batch_size: {}, N perturbed models: {}, Lambda: {}, BitErrorRate: {}, LR: {}=========='.format(cfg.epochs, cfg.batch_size, cfg.N, lb, ber, cfg.learning_rate))
-
+    print('========== Layerwise Training: {}, Random Training: {}'.format(cfg.layerwise, cfg.totalRandom))
 
     print(
         "========== Start training the parameter"
         " of the input transform by using EOT attack =========="
     )
+
     for epoch in range(cfg.epochs):
         running_loss = 0
         running_correct_orig = 0
         running_correct_p = 0
+        each_c_pred = [0] * cfg.N
+        each_p_pred = [0] * cfg.N
               
         # For each epoch, we will use N perturbed model for training.
         for batch_id, (image, label) in tqdm.tqdm(enumerate(trainloader)):
@@ -241,38 +258,54 @@ def transform_train(
                     j = k
 
                 model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=j)
-                model_np = copy.deepcopy(model) # Inference origin images
-                model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
-
-                model_np.eval()
+                if cfg.layerwise:
+                    model_np = copy.deepcopy(model) # Inference origin images
+                    model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
+                    model_np.eval()
+                else:
+                    model, model_perturbed = model.to(device), model_perturbed.to(device)
+                
                 model.eval()
                 model_perturbed.eval()
 
                 # Calculate the activate from the clean model and perturbed model
-                activation_c, activation_p = {}, {}
-                for name, layer in model_np.named_modules():
-                    layer.register_forward_hook(get_activation_c(activation_c, name))
-                    
-                for name, layer in model_perturbed.named_modules():
-                    layer.register_forward_hook(get_activation_p(activation_p, name))
+                if cfg.layerwise:
+                    activation_c, activation_p = {}, {}
+                    for name, layer in model_np.named_modules():
+                        if 'relu' in name:
+                            layer.register_forward_hook(get_activation_c(activation_c, name))
+
+                    for name, layer in model_perturbed.named_modules():
+                        if 'relu' in name:
+                            #print(name)
+                            layer.register_forward_hook(get_activation_p(activation_p, name))
 
                 # Inference the clean model and perturbed model
-                _ = model_np(image)
-                out = model(image_adv)  # pylint: disable=E1102
-                out_biterror = model_perturbed(image_adv)  # pylint: disable=E1102                
+                out_biterror_without_p = model_perturbed(image) 
+                _, pred_without_p = torch.max(out_biterror_without_p, 1)
+                each_c_pred[k] += torch.sum(pred_without_p == label.data).item()
 
+                if cfg.layerwise:
+                    _ = model_np(image)
+
+                out = model(image_adv)  # pylint: disable=E1102
+                out_biterror = model_perturbed(image_adv)  # pylint: disable=E1102   
+                              
                 # Compute the loss for clean model and perturbed model
                 loss_orig, pred_orig = compute_loss(out, label)
-                loss_p, pred_p = compute_loss(out_biterror, label)                    
+                loss_p, pred_p = compute_loss(out_biterror, label)     
+                #print(pred_p)   
+
+                each_p_pred[k] += torch.sum(pred_p == label.data).item()     
                     
                 # Keep the running accuracy of clean model and perturbed model.
                 running_correct_orig += torch.sum(pred_orig == label.data).item()
-                running_correct_p += torch.sum(pred_p == label.data).item()     
-            
+                running_correct_p += torch.sum(pred_p == label.data).item() 
+
                 # Calculate the total loss. 
                 if cfg.layerwise:
                     #print(layerwise(activation_c, activation_p))
-                    loss = loss_orig + lb * layerwise(activation_c, activation_p)
+                    loss = loss_orig + lb * (loss_p + layerwise(activation_c, activation_p))
                 else:
                     loss = loss_orig + lb * loss_p
 
@@ -283,9 +316,19 @@ def transform_train(
                 optimizer.zero_grad()
                 loss.backward()
                 
-                # Sum all of the gradients
-                total_grads += Pg.P.grad 
+                #for param in model_perturbed.parameters():
+                #    print(param.grad)
 
+                # print('{}. Grad norm: {}'.format(k, torch.linalg.norm(torch.flatten(Pg.P.grad), dim=0, ord=2)))
+                # g_norm = Pg.P.grad / torch.linalg.norm(torch.flatten(Pg.P.grad), dim=0, ord=2)
+                # print('{}. Grad normalization norm: {}'.format(k, torch.linalg.norm(torch.flatten(g_norm), dim=0, ord=2)))
+                # print('{}. Grad normalization norm: {}'.format(k, g_norm))
+                
+                # Sum all of the gradients
+                total_grads += Pg.P.grad
+                #total_grads += g_norm
+                
+            # imgMSE(image, image_adv)
             # Average the gradients
             mean_grads = total_grads / cfg.N
 
@@ -296,6 +339,10 @@ def transform_train(
             # Apply gradients by optimizer to parameter           
             optimizer.step()
             lr_scheduler.step()
+            
+        print('P 2-norm: {}, MSE: {}'.format(torch.linalg.norm(torch.flatten(Pg.P), dim=0, ord=2), imgMSE(image, image_adv)))
+        print('Each pred w/o transformation: {}'.format([x/len(trainloader.dataset) for x in each_c_pred]))
+        print('Each pred with transformation: {}'.format([x/len(trainloader.dataset) for x in each_p_pred]))
             
         # Keep the running accuracy of clean model and perturbed model for all mini-batch.
         accuracy_orig = running_correct_orig / (len(trainloader.dataset) * cfg.N)
@@ -311,6 +358,13 @@ def transform_train(
                 accuracy_p,
             )
         )
+
+        storeLoss.append(running_loss / cfg.N)
+
+    # Draw learning curve:
+    plt.plot([e+1 for e in range(cfg.epochs)], storeLoss)
+    plt.title('Learning Curve')
+    plt.savefig('result.jpg')
 
     print('========== Start checking the accuracy with different perturbed model ==========')
     # Setting without input transformation
@@ -368,4 +422,4 @@ def transform_train(
 
     # Saving the result of the parameter!
     torch.save({'Reprogrammed Perturbation': Pg.P},
-        '{}/arch_{}_LR_{}_E_{}_gradsmean_N_{}_ber_{}_lb_{}.pt'.format(cfg.save_dir, arch, cfg.learning_rate, cfg.epochs, cfg.N, ber, lb))
+        cfg.save_dir + 'EOPM_arch_{}_LR_p{}_E_{}_ber_{}_lb_{}_Normal_initZero.pt'.format(arch, cfg.learning_rate, cfg.epochs, ber, lb))

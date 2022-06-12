@@ -22,12 +22,23 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
+# Sinlge model
 import zs_test as test
 import zs_train as train
 import zs_train_input_transform_single as transform_single
+import zs_train_input_transform_single_gen as transform_single_gen
+import zs_train_input_transform_single_attention as transform_single_attention
+
+import zs_train_input_transform_activation as transform_activation
+
+# EOPM-Based
 import zs_train_input_transform_eopm as transform_eopm
 import zs_train_input_transform_mlp_eopm as transform_mlp_eopm
+import zs_train_input_transform_eopm_gen as transform_eopm_gen
+
+# Adversarial-Based
 import zs_train_input_transform_adversarial as transform_adversarial
+import zs_train_input_transform_adversarial_gen as transform_adversarial_gen
 import zs_train_input_transform_mlp_adversarial as transform_mlp_adversarial
 import zs_train_input_transform_adversarial_w as transform_adversarial_w
 import zs_train_input_transform_eval as transform_eval
@@ -54,9 +65,12 @@ def main():
         "mode",
         help="Specify operation to perform",
         default="eval",
-        choices=["train", "eval", "transform_single", "transform_eval",
-                 "transform_eopm", "transform_mlp_eopm",
+        choices=["train", "eval", "transform_single", "transform_eval", "transform_activation",
+                "transform_single_attention",
+                "transform_single_gen","transform_eopm_gen",
+                 "transform_eopm", "transform_mlp_eopm", 
                  "transform_adversarial", "transform_mlp_adversarial", "transform_adversarial_w", 
+                 "transform_adversarial_gen",
                 ],
     )
     parser.add_argument(
@@ -203,7 +217,7 @@ def main():
             transform=transform_train,
         )
         trainloader = torch.utils.data.DataLoader(
-            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=2
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=8
         )
 
         testset = torchvision.datasets.CIFAR10(
@@ -365,11 +379,83 @@ def main():
             args.bit_error_rate,
             args.position,
         )
+    elif args.mode == "transform_single_gen":
+        print("input_transform_train_single_gen", args)
+        cfg.save_dir = 'single_p_gen/'
+        cfg.save_dir_curve = 'single_curve_gen/'
+        transform_single_gen.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_single_attention":
+        print("input_transform_train_single_attention", args)
+        cfg.save_dir = 'single_p_attention/'
+        cfg.save_dir_curve = 'single_curve_attention/'
+        transform_single_attention.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_activation":
+        print("input_transform_train_activation", args)
+        cfg.save_dir = 'activation_p/'
+        cfg.save_dir_curve = 'activation_curve/'
+        transform_activation.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
     elif args.mode == "transform_eopm":
         print("input_transform_train_eopm", args)
         cfg.save_dir = 'eopm_p/'
         cfg.save_dir_curve = 'eopm_curve/'
         transform_eopm.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_eopm_gen":
+        print("input_transform_train_eopm_gen", args)
+        cfg.save_dir = 'eopm_p_gen/'
+        cfg.save_dir_curve = 'eopm_curve_gen/'
+        transform_eopm_gen.transform_train(
             trainloader,
             testloader,
             args.arch,
@@ -424,6 +510,24 @@ def main():
         cfg.save_dir = 'mlp_adversarial_p/'
         cfg.save_dir_curve = 'mlp_adversarial_curve/'
         transform_mlp_adversarial.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_adversarial_gen":
+        print("input_transform_train_adversarial_gen", args)
+        cfg.save_dir = 'adversarial_gen/'
+        cfg.save_dir_curve = 'adversarial_gen/'
+        transform_adversarial_gen.transform_train(
             trainloader,
             testloader,
             args.arch,

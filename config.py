@@ -16,11 +16,12 @@ from easydict import EasyDict
 
 cfg = EasyDict()
 
-cfg.machine = 'TWCC' # TWCC / lab
+cfg.machine = 'lab' # TWCC / lab
 
-#cfg.faulty_layers = []
-# cfg.faulty_layers = ['linear']
-cfg.faulty_layers = ["linear", "conv"]
+# cfg.faulty_layers = []
+# cfg.faulty_layers = ['l3']
+cfg.faulty_layers = ['conv', 'l1', 'l2', 'l3', 'l4', 'linear']  # For ResNet18
+# cfg.faulty_layers = ["linear", "conv"]
 
 cfg.batch_size = 512
 cfg.test_batch_size = 100
@@ -75,9 +76,9 @@ cfg.seed = 0
 
 # For EOPM
 cfg.N = 100
-cfg.randomRange = 10000
+cfg.randomRange = 30000
 cfg.totalRandom = True # True: Sample perturbed models in the range cfg.randomRange
-cfg.layerwise = True # True: Layerwise training / False: Normal training
+cfg.layerwise = False # True: Layerwise training / False: Normal training
 
 # For transform adversarial
 cfg.alpha = 1e-3
@@ -85,8 +86,10 @@ cfg.PGD_STEP = 1
 
 # For transform generalization testing:
 cfg.beginSeed = 50000
-cfg.endSeed = 500010
+cfg.endSeed = 50010
 
 # For transform_eval
-cfg.testing_mode = 'random_bit_error' # random_bit_error / adversarial
-#cfg.P_PATH = '/home/haolun/IBM-energy-efficient-resilience_refactor/adversarial_p/adversarial_arch_resnet18_LR_a1_p0.001_E_1_PGD_1_ber_0.01_lb_1.pt'
+cfg.testing_mode = 'generator_base' # random_bit_error / adversarial / activation / generator_base
+cfg.P_PATH = '/home/haolun/energy-efficient-resilience_dev/activation_p/Activation_test_arch_resnet18_LR_p0.00075_E_5_ber_0.01_lb_0.01_X+P_NowE5.pt'
+cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev/eopm_p_gen/EOPM_GeneratorV1_arch_resnet18_LR0.05_E_100_ber_0.01_lb_1.0_NOWE_99.pt'
+

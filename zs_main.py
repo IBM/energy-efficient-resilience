@@ -58,7 +58,8 @@ def main():
     parser.add_argument(
         "arch",
         help="Input network architecture",
-        choices=["resnet18", "resnet34", "vgg11", "vgg16", "lenet"],
+        choices=["resnet18", "resnet34", "resnet50", "resnet101",
+                 "vgg11", "vgg16", "lenet"],
         default="resnet18",
     )
     parser.add_argument(

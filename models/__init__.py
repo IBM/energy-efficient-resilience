@@ -42,6 +42,10 @@ def init_models(arch, in_channels, precision, retrain, checkpoint_path):
         model = resnetf("resnet18", 10, precision, 0, 0, 0, 0, [])
     elif arch == "resnet34":
         model = resnetf("resnet34", 10, precision, 0, 0, 0, 0, [])
+    elif arch == "resnet50":
+        model = resnetf("resnet50", 10, precision, 0, 0, 0, 0, [])
+    elif arch == "resnet101":
+        model = resnetf("resnet101", 10, precision, 0, 0, 0, 0, [])
     else:
         model = lenetf(in_channels, 10, precision, 0, 0, 0, 0, [])
 
@@ -143,6 +147,28 @@ def init_models_faulty(
         elif arch == "resnet34":
             model = resnetf(
                 "resnet34",
+                10,
+                precision,
+                bit_error_rate,
+                position,
+                BitErrorMap0,
+                BitErrorMap1,
+                faulty_layers,
+            )
+        elif arch == "resnet50":
+            model = resnetf(
+                "resnet50",
+                10,
+                precision,
+                bit_error_rate,
+                position,
+                BitErrorMap0,
+                BitErrorMap1,
+                faulty_layers,
+            )
+        elif arch == "resnet101":
+            model = resnetf(
+                "resnet101",
                 10,
                 precision,
                 bit_error_rate,

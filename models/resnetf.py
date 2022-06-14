@@ -43,9 +43,11 @@ class BasicBlock(nn.Module):
         BitErrorMap0to1,
         BitErrorMap1to0,
         faulty_layers,
+        attack=False,
     ):
         super(BasicBlock, self).__init__()
-        if "conv" in faulty_layers:
+        if attack:
+            # print('In block')
             self.conv1 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
                 in_planes,
                 planes,
@@ -70,7 +72,7 @@ class BasicBlock(nn.Module):
                 clamp_val=conv_clamp_val,
             )
         self.bn1 = nn.BatchNorm2d(planes)
-        if "conv" in faulty_layers:
+        if attack:
             self.conv2 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
                 planes,
                 planes,
@@ -99,7 +101,7 @@ class BasicBlock(nn.Module):
         self.relu2 = nn.ReLU()
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != self.expansion * planes:
-            if "conv" in faulty_layers:
+            if attack:
                 self.shortcut = nn.Sequential(
                     zs_faultinjection_ops.nnConv2dPerturbWeight_op(
                         in_planes,
@@ -137,6 +139,143 @@ class BasicBlock(nn.Module):
         out = self.relu2(out)
         return out
 
+class Bottleneck(nn.Module):
+    expansion = 4
+
+    def __init__(
+        self,
+        in_planes,
+        planes,
+        stride,
+        precision,
+        ber,
+        position,
+        BitErrorMap0to1,
+        BitErrorMap1to0,
+        faulty_layers,
+        attack=False,
+    ):
+        super(Bottleneck, self).__init__()
+        if attack:
+            # print('In block')
+            self.conv1 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
+                in_planes,
+                planes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+                precision=precision,
+                clamp_val=conv_clamp_val,
+                BitErrorMap0to1=BitErrorMap0to1,
+                BitErrorMap1to0=BitErrorMap1to0,
+            )
+        else:
+            self.conv1 = zs_quantized_ops.nnConv2dSymQuant_op(
+                in_planes,
+                planes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+                precision=precision,
+                clamp_val=conv_clamp_val,
+            )
+        self.bn1 = nn.BatchNorm2d(planes)
+        if attack:
+            self.conv2 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
+                planes,
+                planes,
+                kernel_size=3,
+                stride=stride,
+                padding=1,
+                bias=False,
+                precision=precision,
+                clamp_val=conv_clamp_val,
+                BitErrorMap0to1=BitErrorMap0to1,
+                BitErrorMap1to0=BitErrorMap1to0,
+            )
+        else:
+            self.conv2 = zs_quantized_ops.nnConv2dSymQuant_op(
+                planes,
+                planes,
+                kernel_size=3,
+                stride=stride,
+                padding=1,
+                bias=False,
+                precision=precision,
+                clamp_val=conv_clamp_val,
+            )
+        self.bn2 = nn.BatchNorm2d(planes)
+        if attack:
+            self.conv3 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
+                planes,
+                self.expansion * planes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+                precision=precision,
+                clamp_val=conv_clamp_val,
+                BitErrorMap0to1=BitErrorMap0to1,
+                BitErrorMap1to0=BitErrorMap1to0,
+            )
+        else:
+            self.conv3 = zs_quantized_ops.nnConv2dSymQuant_op(
+                planes,
+                self.expansion * planes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+                precision=precision,
+                clamp_val=conv_clamp_val,
+            )
+        self.bn3 = nn.BatchNorm2d(self.expansion * planes)
+        self.relu1 = nn.ReLU()
+        self.relu2 = nn.ReLU()
+        self.relu3 = nn.ReLU()
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_planes != self.expansion * planes:
+            if attack:
+                self.shortcut = nn.Sequential(
+                    zs_faultinjection_ops.nnConv2dPerturbWeight_op(
+                        in_planes,
+                        self.expansion * planes,
+                        kernel_size=1,
+                        stride=stride,
+                        padding=0,
+                        bias=False,
+                        precision=precision,
+                        clamp_val=conv_clamp_val,
+                        BitErrorMap0to1=BitErrorMap0to1,
+                        BitErrorMap1to0=BitErrorMap1to0,
+                    ),
+                    nn.BatchNorm2d(self.expansion * planes),
+                )
+            else:
+                self.shortcut = nn.Sequential(
+                    zs_quantized_ops.nnConv2dSymQuant_op(
+                        in_planes,
+                        self.expansion * planes,
+                        kernel_size=1,
+                        stride=stride,
+                        padding=0,
+                        bias=False,
+                        precision=precision,
+                        clamp_val=conv_clamp_val,
+                    ),
+                    nn.BatchNorm2d(self.expansion * planes),
+                )
+
+    def forward(self, x):
+        out = self.relu1(self.bn1(self.conv1(x)))
+        out = self.relu2(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = self.relu3(out)
+        return out
+
 
 class ResNet(nn.Module):
     def __init__(
@@ -155,6 +294,7 @@ class ResNet(nn.Module):
         self.in_planes = 64
 
         if "conv" in faulty_layers:
+            # print('In first')
             self.conv1 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
                 3,
                 64,
@@ -190,6 +330,7 @@ class ResNet(nn.Module):
             BitErrorMap0to1=BitErrorMap0to1,
             BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
+            attack = (True if 'l1' in faulty_layers else False)
         )
         self.layer2 = self._make_layer(
             block,
@@ -202,6 +343,7 @@ class ResNet(nn.Module):
             BitErrorMap0to1=BitErrorMap0to1,
             BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
+            attack = (True if 'l2' in faulty_layers else False)
         )
         self.layer3 = self._make_layer(
             block,
@@ -214,6 +356,7 @@ class ResNet(nn.Module):
             BitErrorMap0to1=BitErrorMap0to1,
             BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
+            attack = (True if 'l3' in faulty_layers else False)
         )
         self.layer4 = self._make_layer(
             block,
@@ -226,6 +369,7 @@ class ResNet(nn.Module):
             BitErrorMap0to1=BitErrorMap0to1,
             BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
+            attack = (True if 'l4' in faulty_layers else False)
         )
         if "linear" in faulty_layers:
             self.linear = zs_faultinjection_ops.nnLinearPerturbWeight_op(
@@ -253,6 +397,7 @@ class ResNet(nn.Module):
         BitErrorMap0to1,
         BitErrorMap1to0,
         faulty_layers,
+        attack = False
     ):
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
@@ -268,6 +413,7 @@ class ResNet(nn.Module):
                     BitErrorMap0to1,
                     BitErrorMap1to0,
                     faulty_layers,
+                    attack,
                 )
             )
             self.in_planes = planes * block.expansion
@@ -328,6 +474,48 @@ def ResNet34(
         faulty_layers,
     )
 
+def ResNet50(
+    classes,
+    precision,
+    ber,
+    position,
+    BitErrorMap0to1,
+    BitErrorMap1to0,
+    faulty_layers,
+):
+    return ResNet(
+        Bottleneck,
+        [3, 4, 6, 3],
+        classes,
+        precision,
+        ber,
+        position,
+        BitErrorMap0to1,
+        BitErrorMap1to0,
+        faulty_layers,
+    )
+
+def ResNet101(
+    classes,
+    precision,
+    ber,
+    position,
+    BitErrorMap0to1,
+    BitErrorMap1to0,
+    faulty_layers,
+):
+    return ResNet(
+        Bottleneck,
+        [3, 4, 23, 3],
+        classes,
+        precision,
+        ber,
+        position,
+        BitErrorMap0to1,
+        BitErrorMap1to0,
+        faulty_layers,
+    )
+
 
 def resnetf(
     arch,
@@ -349,8 +537,28 @@ def resnetf(
             BitErrorMap1to0,
             faulty_layers,
         )
-    else:
+    elif arch == "resnet34":
         return ResNet34(
+            classes,
+            precision,
+            ber,
+            position,
+            BitErrorMap0to1,
+            BitErrorMap1to0,
+            faulty_layers,
+        )
+    elif arch == "resnet50":
+        return ResNet50(
+            classes,
+            precision,
+            ber,
+            position,
+            BitErrorMap0to1,
+            BitErrorMap1to0,
+            faulty_layers,
+        )
+    elif arch == "resnet101":
+        return ResNet101(
             classes,
             precision,
             ber,

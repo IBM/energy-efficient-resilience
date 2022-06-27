@@ -25,9 +25,14 @@ https://pytorch.org/docs/stable/_modules/torch/nn/modules/linear.html
 import math
 
 import torch
+import copy
 import torch.nn.functional as F
 from torch import nn
 from torch.nn.modules.utils import _pair
+#import os, sys
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import faultsMap as fmap
 
 # from torch.nn.modules.utils import _single
 
@@ -163,8 +168,6 @@ class nnLinearPerturbWeight(nn.Linear):
         bias,
         precision=-1,
         clamp_val=0.1,
-        BitErrorMap0to1=0,
-        BitErrorMap1to0=0,
     ):
         super().__init__(in_features, out_features, bias)
         self.in_features = in_features
@@ -176,15 +179,13 @@ class nnLinearPerturbWeight(nn.Linear):
         #    self.register_parameter('bias', None)
         self.precision = precision
         self.clamp_val = clamp_val
-        self.BitErrorMap0 = BitErrorMap0to1
-        self.BitErrorMap1 = BitErrorMap1to0
         self.reset_parameters()
 
     def forward(self, input):
         if self.precision > 0:
             BitErrorMap0to1, BitErrorMap1to0 = self.genFaultMap(
-                self.BitErrorMap0,
-                self.BitErrorMap1,
+                fmap.BitErrorMap0,
+                fmap.BitErrorMap1,
                 self.precision,
                 self.weight,
             )
@@ -220,22 +221,30 @@ class nnLinearPerturbWeight(nn.Linear):
 
         weights_per_row = (int)(mem_array_cols / precision)
 
-        BitErrorMap0to1 = torch.zeros(
-            (mem_array_rows, weights_per_row), dtype=torch.uint8
-        ).to(device)
-        BitErrorMap1to0 = torch.zeros(
-            (mem_array_rows, weights_per_row), dtype=torch.uint8
-        ).to(device)
+        # Because in random bit error, BitErrorMap0to1 and BitErrorMap1to0 will be the same for every layers in the same perturbed model
+        # Therefore, calculate the for loop for once is enough.
+        if fmap.BitErrorMap0to1 is None and fmap.BitErrorMap1to0 is None:
+            BitErrorMap0to1 = torch.zeros(
+                (mem_array_rows, weights_per_row), dtype=torch.uint8
+            ).to(device)
+            BitErrorMap1to0 = torch.zeros(
+                (mem_array_rows, weights_per_row), dtype=torch.uint8
+            ).to(device)
 
-        # Reshaping bit error map to map weights
-        for k in range(0, weights_per_row):
-            for j in range(0, precision):
-                BitErrorMap0to1[:, k] += (
-                    BitErrorMap_flip0to1[:, k * precision + j] << j
-                )
-                BitErrorMap1to0[:, k] += (
-                    BitErrorMap_flip1to0[:, k * precision + j] << j
-                )
+            # Reshaping bit error map to map weights
+            for k in range(0, weights_per_row):
+                for j in range(0, precision):
+                    BitErrorMap0to1[:, k] += (
+                        BitErrorMap_flip0to1[:, k * precision + j] << j
+                    )
+                    BitErrorMap1to0[:, k] += (
+                        BitErrorMap_flip1to0[:, k * precision + j] << j
+                    )
+            fmap.BitErrorMap0to1 = copy.deepcopy(BitErrorMap0to1)
+            fmap.BitErrorMap1to0 = copy.deepcopy(BitErrorMap1to0)
+        else:
+            BitErrorMap0to1 = copy.deepcopy(fmap.BitErrorMap0to1)
+            BitErrorMap1to0 = copy.deepcopy(fmap.BitErrorMap1to0)
 
         rows = math.ceil(numweights / weights_per_row)
         cols = weights_per_row
@@ -259,8 +268,6 @@ def nnLinearPerturbWeight_op(
     out_features,
     precision,
     clamp_val,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
 ):
     return nnLinearPerturbWeight(
         in_features,
@@ -268,8 +275,6 @@ def nnLinearPerturbWeight_op(
         True,
         precision,
         clamp_val,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
     )
 
 
@@ -292,8 +297,6 @@ class nnConv2dPerturbWeight(nn.Conv2d):
         padding_mode="zeros",
         precision=-1,
         clamp_val=0.5,
-        BitErrorMap0to1=0,
-        BitErrorMap1to0=0,
     ):
         kernel_size = _pair(kernel_size)
         stride = _pair(stride)
@@ -312,14 +315,12 @@ class nnConv2dPerturbWeight(nn.Conv2d):
         )
         self.precision = precision
         self.clamp_val = clamp_val
-        self.BitErrorMap0 = BitErrorMap0to1
-        self.BitErrorMap1 = BitErrorMap1to0
 
     def forward(self, input):
         if self.precision > 0:
             BitErrorMap0to1, BitErrorMap1to0 = self.genFaultMap(
-                self.BitErrorMap0,
-                self.BitErrorMap1,
+                fmap.BitErrorMap0,
+                fmap.BitErrorMap1,
                 self.precision,
                 self.weight,
             )
@@ -348,28 +349,37 @@ class nnConv2dPerturbWeight(nn.Conv2d):
         self, BitErrorMap_flip0to1, BitErrorMap_flip1to0, precision, weights
     ):
 
+        
         numweights = torch.numel(weights)
         mem_array_rows = BitErrorMap_flip0to1.shape[0]
         mem_array_cols = BitErrorMap_flip0to1.shape[1]
 
         weights_per_row = (int)(mem_array_cols / precision)
 
-        BitErrorMap0to1 = torch.zeros(
-            (mem_array_rows, weights_per_row), dtype=torch.uint8
-        ).to(device)
-        BitErrorMap1to0 = torch.zeros(
-            (mem_array_rows, weights_per_row), dtype=torch.uint8
-        ).to(device)
+        # Because in random bit error, BitErrorMap0to1 and BitErrorMap1to0 will be the same for every layers in the same perturbed model
+        # Therefore, calculate the for loop for once is enough.
+        if fmap.BitErrorMap0to1 is None and fmap.BitErrorMap1to0 is None:
+            BitErrorMap0to1 = torch.zeros(
+                (mem_array_rows, weights_per_row), dtype=torch.uint8
+            ).to(device)
+            BitErrorMap1to0 = torch.zeros(
+                (mem_array_rows, weights_per_row), dtype=torch.uint8
+            ).to(device)
 
-        # Reshaping bit error map to map weights
-        for k in range(0, weights_per_row):
-            for j in range(0, precision):
-                BitErrorMap0to1[:, k] += (
-                    BitErrorMap_flip0to1[:, k * precision + j] << j
-                )
-                BitErrorMap1to0[:, k] += (
-                    BitErrorMap_flip1to0[:, k * precision + j] << j
-                )
+            # Reshaping bit error map to map weights
+            for k in range(0, weights_per_row):
+                for j in range(0, precision):
+                    BitErrorMap0to1[:, k] += (
+                        BitErrorMap_flip0to1[:, k * precision + j] << j
+                    )
+                    BitErrorMap1to0[:, k] += (
+                        BitErrorMap_flip1to0[:, k * precision + j] << j
+                    )
+            fmap.BitErrorMap0to1 = copy.deepcopy(BitErrorMap0to1)
+            fmap.BitErrorMap1to0 = copy.deepcopy(BitErrorMap1to0)
+        else:
+            BitErrorMap0to1 = copy.deepcopy(fmap.BitErrorMap0to1)
+            BitErrorMap1to0 = copy.deepcopy(fmap.BitErrorMap1to0)
 
         rows = math.ceil(numweights / weights_per_row)
         cols = weights_per_row
@@ -397,8 +407,6 @@ def nnConv2dPerturbWeight_op(
     bias,
     precision,
     clamp_val,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
 ):
     return nnConv2dPerturbWeight(
         in_channels,
@@ -412,6 +420,4 @@ def nnConv2dPerturbWeight_op(
         padding_mode="zeros",
         precision=precision,
         clamp_val=clamp_val,
-        BitErrorMap0to1=BitErrorMap0to1,
-        BitErrorMap1to0=BitErrorMap1to0,
     )

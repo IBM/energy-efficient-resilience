@@ -24,12 +24,14 @@ import copy
 import os
 
 from config import cfg
-from models import init_models_pairs
+from models import init_models_pairs, create_faults
+import faultsMap as fmap
 
 
 torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 EPS = 1e-20
+
 
 
 class Generator(nn.Module):
@@ -236,12 +238,19 @@ def quantization(model_weights, precision=8):
     return delta
 
 def pgd(model_orig, model_p, epsilon, alpha):
+    from random import sample
+    import random
+    bit_error_list = list(np.arange(0, 256))
     for (name_orig, param_orig), (name_p, param_p) in zip(model_orig.named_parameters(), model_p.named_parameters()):
-        if param_p.requires_grad:
-            delta = quantization(param_p)
-            param_p.data = param_p.data + (alpha * param_p.grad.sign())
-            # print(epsilon*delta)
-            param_p.data = torch.clamp(param_p.data, min=param_orig.data-(epsilon*delta), max=param_orig.data+(epsilon*delta))
+        # epsilon = sum(sample(bit_error_list, random.randint(1, len(bit_error_list)))) * 0.02
+        # epsilon = sum(sample(bit_error_list, 1)) * 0.01
+        if param_p.requires_grad and ('conv' in name_p or 'linear' in name_p):
+            delta = quantization(param_p.data)
+            param_p.data = param_p.data + (alpha * (epsilon*delta) * param_p.grad.sign())
+            param_p.data = torch.clamp(param_p.data, min = param_orig.data-(epsilon*delta),  max = param_orig.data+(epsilon*delta) )
+            param_p.data = torch.clamp(param_p.data, min = -128 * delta, max = 127 * delta)
+            
+            
 
 # For layerwise training
 def get_activation_c(act_c, name):
@@ -322,10 +331,10 @@ def transform_train(
     #)
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=200, gamma=cfg.decay
+        optimizer, step_size=1000, gamma=cfg.decay
     )
     lb = cfg.lb  # Lambda 
-    # cfg.alpha = (1 / cfg.PGD_STEP) 
+    cfg.alpha = (1 / cfg.PGD_STEP) 
 
     for name, param in Gen.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
@@ -338,10 +347,11 @@ def transform_train(
 
     (model, _, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0) # Create clean model.
     
-    EPSILON = ber * 511 #(256+128+64+32+16+8+4+2+1)
+    # EPSILON = ber * 511 #(256+128+64+32+16+8+4+2+1)
+    EPSILON = 0.01 * 128 #(256+128+64+32+16+8+4+2+1)
 
     learning_curve_loss = []
-
+ 
     for epoch in range(cfg.epochs):
         running_loss = 0
         running_correct_orig = 0
@@ -380,6 +390,12 @@ def transform_train(
             for param in Gen.parameters():
                 param.requires_grad = True
 
+            
+            model, model_perturbed = model.to(device), model_perturbed.to(device)
+            model.eval()
+            model_perturbed.eval()
+            Gen.train()
+
             loss = 0
             image, label = image.to(device), label.to(device)
             image_adv, _ = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
@@ -389,10 +405,7 @@ def transform_train(
             # model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
             # model_np.eval()
             
-            model, model_perturbed = model.to(device), model_perturbed.to(device)
-            model.eval()
-            model_perturbed.eval()
-            Gen.train()
+            
 
             # Calculate the activate from the clean model and perturbed model
             #activation_c, activation_p = {}, {}
@@ -452,8 +465,8 @@ def transform_train(
         # same: use (epsilon*delta), different: only fix alpha
         if (epoch + 1) % 50 == 0 or (epoch + 1) == cfg.epochs:
             # Saving the result of the generator!
-            torch.save(Gen,
-                cfg.save_dir + 'Adversarial_GeneratorV1_arch_{}_LR_a{}_p{}_E_{}_PGD_{}_ber_{}_lb_{}_NOWE_{}_fix.pt'.format(arch, cfg.alpha, cfg.learning_rate, cfg.epochs, cfg.PGD_STEP, ber, lb, epoch+1))
+            torch.save(Gen.state_dict(),
+                cfg.save_dir + 'Adversarial_GeneratorV1_arch_{}_LR_a{}_p{}_E_{}_PGD_{}_ber_{}_lb_{}_NOWE_{}_same_255.pt'.format(arch, cfg.alpha, cfg.learning_rate, cfg.epochs, cfg.PGD_STEP, ber, lb, epoch+1))
 
     # Draw learning curve:
     plt.plot([e+1 for e in range(cfg.epochs)], storeLoss)
@@ -509,11 +522,14 @@ def transform_train(
     accuracy_orig_test_list_with_transformation = []
     accuracy_p_test_list_with_transformation = []
 
+    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos)
+    model, model_perturbed = model.to(device), model_perturbed.to(device)
     for i in range(cfg.beginSeed, cfg.endSeed):
         print(' ********** For seed: {} ********** '.format(i))
-        (model, checkpoint_epoch, model_perturbed, checkpoint_epoch_perturbed) = init_models_pairs( 
-                    arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=i)
-        model, model_perturbed = model.to(device), model_perturbed.to(device),
+        fmap.BitErrorMap0to1 = None 
+        fmap.BitErrorMap1to0 = None
+        create_faults(precision, ber, pos, seed=i)
+
         model.eval()
         model_perturbed.eval()
         Gen.eval()

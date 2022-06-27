@@ -39,6 +39,7 @@ import zs_train_input_transform_eopm_gen as transform_eopm_gen
 # Adversarial-Based
 import zs_train_input_transform_adversarial as transform_adversarial
 import zs_train_input_transform_adversarial_gen as transform_adversarial_gen
+import zs_train_input_transform_adversarial_gen_bit as transform_adversarial_gen_bit
 import zs_train_input_transform_mlp_adversarial as transform_mlp_adversarial
 import zs_train_input_transform_adversarial_w as transform_adversarial_w
 import zs_train_input_transform_eval as transform_eval
@@ -59,7 +60,7 @@ def main():
         "arch",
         help="Input network architecture",
         choices=["resnet18", "resnet34", "resnet50", "resnet101",
-                 "vgg11", "vgg16", "lenet"],
+                 "vgg11", "vgg16", "vgg19", "mobilenetv2", "lenet"],
         default="resnet18",
     )
     parser.add_argument(
@@ -71,13 +72,13 @@ def main():
                 "transform_single_gen","transform_eopm_gen",
                  "transform_eopm", "transform_mlp_eopm", 
                  "transform_adversarial", "transform_mlp_adversarial", "transform_adversarial_w", 
-                 "transform_adversarial_gen",
+                 "transform_adversarial_gen", "transform_adversarial_gen_bit",
                 ],
     )
     parser.add_argument(
         "dataset",
         help="Specify dataset",
-        choices=["cifar10", "mnist", "fashion"],
+        choices=["cifar10", "mnist", "fashion", "tinyimagenet"],
         default="fashion",
     )
     group = parser.add_argument_group(
@@ -227,6 +228,43 @@ def main():
             download=True,
             transform=transform_test,
         )
+        testloader = torch.utils.data.DataLoader(
+            testset,
+            batch_size=cfg.test_batch_size,
+            shuffle=False,
+            num_workers=2,
+        )
+    elif args.dataset == "tinyimagenet":
+        dataset = "tinyimagenet"
+        in_channels = 3
+        transform_train = transforms.Compose(
+            [
+                transforms.RandomCrop(64, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Lambda(lambda t: t * 2 - 1),
+            ]
+        )
+
+        transform_test = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Lambda(lambda t: t * 2 - 1),
+            ]
+        )
+
+        trainset = torchvision.datasets.ImageFolder(
+            root=os.path.join(cfg.data_dir + '/tiny-imagenet-200', 'train'), 
+            transform=transform_train)
+
+        trainloader = torch.utils.data.DataLoader(
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=8
+        )
+
+        testset = torchvision.datasets.ImageFolder(
+            root=os.path.join(cfg.data_dir + '/tiny-imagenet-200', 'val'), 
+            transform=transform_test)
+
         testloader = torch.utils.data.DataLoader(
             testset,
             batch_size=cfg.test_batch_size,
@@ -529,6 +567,24 @@ def main():
         cfg.save_dir = 'adversarial_gen/'
         cfg.save_dir_curve = 'adversarial_gen/'
         transform_adversarial_gen.transform_train(
+            trainloader,
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "transform_adversarial_gen_bit":
+        print("input_transform_train_adversarial_gen_bit", args)
+        cfg.save_dir = 'adversarial_gen_bit/'
+        cfg.save_dir_curve = 'adversarial_gen_bit/'
+        transform_adversarial_gen_bit.transform_train(
             trainloader,
             testloader,
             args.arch,

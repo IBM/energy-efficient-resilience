@@ -17,7 +17,10 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 
 from config import cfg
-from models import init_models_pairs
+from models import init_models_pairs, create_faults
+from models.focal import FocalLoss
+import faultsMap as fmap
+
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,87 +44,55 @@ class Generator(nn.Module):
 
         # Encoder
         self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
+        # torch.nn.init.xavier_uniform(self.conv1_1.weight)
         self.bn1_1 = nn.BatchNorm2d(32)
         self.relu1_1 = nn.ReLU()
-        self.conv1_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.bn1_2 = nn.BatchNorm2d(32)
-        self.relu1_2 = nn.ReLU()
         self.maxpool1 = nn.MaxPool2d(kernel_size=2)
         
         self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        # torch.nn.init.xavier_uniform(self.conv2_1.weight)
         self.bn2_1 = nn.BatchNorm2d(64)
         self.relu2_1 = nn.ReLU()
-        self.conv2_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.bn2_2 = nn.BatchNorm2d(64)
-        self.relu2_2 = nn.ReLU()
         self.maxpool2 = nn.MaxPool2d(kernel_size=2)
 
-        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.bn3_1 = nn.BatchNorm2d(128)
+        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        # torch.nn.init.xavier_uniform(self.conv3_1.weight)
+        self.bn3_1 = nn.BatchNorm2d(64)
         self.relu3_1 = nn.ReLU()
-        self.conv3_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn3_2 = nn.BatchNorm2d(128)
-        self.relu3_2 = nn.ReLU()
         self.maxpool3 = nn.MaxPool2d(kernel_size=2)
 
-        
-        self.conv4_1 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn4_1 = nn.BatchNorm2d(128)
+        self.dconv4_1 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=4, stride=2, padding=1)
+        # torch.nn.init.xavier_uniform(self.dconv4_1.weight)
+        self.bn4_1 = nn.BatchNorm2d(64)
         self.relu4_1 = nn.ReLU()
-        self.upsample4_1 = nn.Upsample(scale_factor=2)
-        self.conv4_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn4_2 = nn.BatchNorm2d(128)
-        self.relu4_2 = nn.ReLU()
 
-        self.conv5_1 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
-        self.bn5_1 = nn.BatchNorm2d(64)
+        self.dconv5_1 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1)
+        # torch.nn.init.xavier_uniform(self.dconv5_1.weight)
+        self.bn5_1 = nn.BatchNorm2d(32)
         self.relu5_1 = nn.ReLU()
-        self.upsample5_1 = nn.Upsample(scale_factor=2)
-        self.conv5_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.bn5_2 = nn.BatchNorm2d(64)
-        self.relu5_2 = nn.ReLU()
 
-        self.conv6_1 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
-        self.relu6_1 = nn.ReLU()
-        self.bn6_1 = nn.BatchNorm2d(32)
-        self.upsample6_1 = nn.Upsample(scale_factor=2)
-        self.conv6_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.bn6_2 = nn.BatchNorm2d(32)
-        self.relu6_2 = nn.ReLU()
-
-        self.convout = nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, padding=1)
-        self.bnout = nn.BatchNorm2d(3)
+        self.dconv6_1 = nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=4, stride=2, padding=1)
+        # torch.nn.init.xavier_uniform(self.dconv6_1.weight)
+        self.bn6_1 = nn.BatchNorm2d(3)
         self.tanh = torch.nn.Tanh()
-
-
 
     def forward(self, image):
         img = image.data.clone()
         # Encoder
         x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
-        x = self.relu1_2(self.bn1_2(self.conv1_2(x)))
         x = self.maxpool1(x)
         x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
-        x = self.relu2_2(self.bn2_2(self.conv2_2(x)))
         x = self.maxpool2(x)
         x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
-        x = self.relu3_2(self.bn3_2(self.conv3_2(x)))
         x = self.maxpool3(x)
 
         # Decoder
-        x = self.relu4_1(self.bn4_1(self.conv4_1(x)))
-        x = self.upsample4_1(x)
-        x = self.relu4_2(self.bn4_2(self.conv4_2(x)))
-        x = self.relu5_1(self.bn5_1(self.conv5_1(x)))
-        x = self.upsample5_1(x)
-        x = self.relu5_2(self.bn5_2(self.conv5_2(x)))
-        x = self.relu6_1(self.bn6_1(self.conv6_1(x)))
-        x = self.upsample6_1(x)
-        x = self.relu6_2(self.bn6_2(self.conv6_2(x)))
-        x = self.bnout(self.convout(x))
+        x = self.relu4_1(self.bn4_1(self.dconv4_1(x)))
+        x = self.relu5_1(self.bn5_1(self.dconv5_1(x)))
+        x = self.bn6_1(self.dconv6_1(x))
         out = self.tanh(x)
 
-        x_adv = torch.clamp(img + out, min=-1, max=1)
+        x_adv = torch.clamp(image + out, min=-1, max=1)
 
         return x_adv
 
@@ -129,6 +100,7 @@ def compute_loss(model_outputs, labels):
     _, preds = torch.max(model_outputs, 1)
     labels = labels.view(labels.size(0))  # changing the size from (batch_size,1) to batch_size.
     loss = nn.CrossEntropyLoss()(model_outputs, labels)
+    # loss = focal_loss(model_outputs, labels)
     return loss, preds
 
 def accuracy_checking(
@@ -295,6 +267,9 @@ def transform_train(
     )
     lb = cfg.lb  # Lambda 
 
+    from torchsummary import summary
+    summary(Gen, (3, 32, 32))
+
     for name, param in Gen.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
@@ -305,6 +280,17 @@ def transform_train(
         "========== Start training the parameter"
         " of the input transform by using EOT attack =========="
     )
+
+    # Initialization clean and perturbed model
+    create_faults(precision, ber, pos, seed=0)
+    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos, dataset=dataset)
+    model, model_perturbed =  model.to(device), model_perturbed.to(device)
+
+    # focal_loss = FocalLoss(torch.tensor([0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9]), 2)
+    # focal_loss = focal_loss.to(device)
+
+    from torchsummary import summary
+    summary(model, (3, 32, 32))
 
     for epoch in range(cfg.epochs):
         running_loss = 0
@@ -333,13 +319,17 @@ def transform_train(
                 else:
                     j = k
 
-                model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=j)
+                # Reset the BitErrorMap for different perturbed models.
+                fmap.BitErrorMap0to1 = None 
+                fmap.BitErrorMap1to0 = None
+                
+                # Create faultMap for faultinjection_ops.
+                create_faults(precision, ber, pos, seed=j)
+
                 if cfg.layerwise:
                     model_np = copy.deepcopy(model) # Inference origin images
                     model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
-                    model_np.eval()
-                else:
-                    model, model_perturbed = model.to(device), model_perturbed.to(device)
+                    model_np.eval()                    
                 
                 model.eval()
                 model_perturbed.eval()
@@ -424,16 +414,15 @@ def transform_train(
 
         storeLoss.append(running_loss / cfg.N)
 
-        if (epoch + 1) % 10 == 0 or (epoch + 1) == cfg.epochs:
+        if (epoch + 1) % 20 == 0 or (epoch + 1) == cfg.epochs:
             # Saving the result of the generator!
-            torch.save(Gen,
-                cfg.save_dir + 'EOPM_GeneratorV1_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_NOWE_{}.pt'.format(arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N, epoch+1))
-
-
-    # Draw learning curve:
-    plt.plot([e+1 for e in range(cfg.epochs)], storeLoss)
-    plt.title('Learning Curve')
-    plt.savefig(cfg.save_dir + 'LearningCurve.jpg')
+            torch.save(Gen.state_dict(),
+                cfg.save_dir + 'EOPM_GeneratorV9_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step1000_NOWE_{}.pt'.format(dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N, epoch+1))
+            
+            # Draw learning curve:
+            plt.plot([e+1 for e in range(epoch + 1)], storeLoss)
+            plt.title('Learning Curve')
+            plt.savefig(cfg.save_dir + 'EOPM_GeneratorV9_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step1000_LearningCurve.jpg'.format(dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N))
 
     print('========== Start checking the accuracy with different perturbed model ==========')
     # Setting without input transformation
@@ -448,10 +437,13 @@ def transform_train(
     accuracy_orig_test_list_with_transformation = []
     accuracy_p_test_list_with_transformation = []
 
+    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos, dataset=dataset)
+    model, model_perturbed = model.to(device), model_perturbed.to(device)
     for i in range(cfg.beginSeed, cfg.endSeed):
         print(' ********** For seed: {} ********** '.format(i))
-        model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=i)
-        model, model_perturbed = model.to(device), model_perturbed.to(device),
+        fmap.BitErrorMap0to1 = None 
+        fmap.BitErrorMap1to0 = None
+        create_faults(precision, ber, pos, seed=i)
 
         model.eval()
         model_perturbed.eval()

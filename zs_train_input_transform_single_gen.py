@@ -15,9 +15,12 @@
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
+import torch.nn.functional as F
 
 from config import cfg
-from models import init_models_pairs
+from models import init_models_pairs, create_faults
+import faultsMap as fmap
+
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
@@ -28,68 +31,101 @@ torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+class DoubleConv(nn.Module):
+    """(convolution => [BN] => ReLU) * 2"""
+
+    def __init__(self, in_channels, out_channels, mid_channels=None):
+        super().__init__()
+        if not mid_channels:
+            mid_channels = out_channels
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        return self.double_conv(x)
+
+class Down(nn.Module):
+    """Downscaling with maxpool then double conv"""
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(2),
+            DoubleConv(in_channels, out_channels)
+        )
+
+    def forward(self, x):
+        return self.maxpool_conv(x)
+
+class Up(nn.Module):
+    """Upscaling then double conv"""
+
+    def __init__(self, in_channels, out_channels, bilinear=True):
+        super().__init__()
+
+        # if bilinear, use the normal convolutions to reduce the number of channels
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+        else:
+            self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+            self.conv = DoubleConv(in_channels, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        # input is CHW
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
+
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+
+
+class OutConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(OutConv, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        return self.conv(x)
+
 class Generator(nn.Module):
-    """
-    Apply reprogramming.
-    """
-    def __init__(self, cfg):
+    def __init__(self, n_channels, bilinear=False):
         super(Generator, self).__init__()
-        self.cfg = cfg
-        self.num_classes = 10
+        self.bilinear = bilinear
 
-        # Encoder
-        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv1_1.weight)
-        self.bn1_1 = nn.BatchNorm2d(32)
-        self.relu1_1 = nn.ReLU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
-        
-        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv2_1.weight)
-        self.bn2_1 = nn.BatchNorm2d(64)
-        self.relu2_1 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
-
-        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv3_1.weight)
-        self.bn3_1 = nn.BatchNorm2d(64)
-        self.relu3_1 = nn.ReLU()
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
-
-        self.dconv4_1 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv4_1.weight)
-        self.bn4_1 = nn.BatchNorm2d(64)
-        self.relu4_1 = nn.ReLU()
-
-        self.dconv5_1 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv5_1.weight)
-        self.bn5_1 = nn.BatchNorm2d(32)
-        self.relu5_1 = nn.ReLU()
-
-        self.dconv6_1 = nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv6_1.weight)
-        self.bn6_1 = nn.BatchNorm2d(3)
-        self.tanh = torch.nn.Tanh()
+        self.inc = DoubleConv(3, 16)
+        self.down1 = Down(16, 32)
+        self.down2 = Down(32, 64)
+        factor = 2 if bilinear else 1
+        self.down3 = Down(64, 128 // factor)
+        self.up1 = Up(128, 64 // factor, bilinear)
+        self.up2 = Up(64, 32 // factor, bilinear)
+        self.up3 = Up(32, 16 // factor, bilinear)
+        self.outc = OutConv(16, 3)
 
     def forward(self, image):
         img = image.data.clone()
-        # Encoder
-        x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
-        x = self.maxpool1(x)
-        x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
-        x = self.maxpool2(x)
-        x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
-        x = self.maxpool3(x)
-
-        # Decoder
-        x = self.relu4_1(self.bn4_1(self.dconv4_1(x)))
-        x = self.relu5_1(self.bn5_1(self.dconv5_1(x)))
-        x = self.bn6_1(self.dconv6_1(x))
-        out = self.tanh(x)
-
+        x1 = self.inc(img) 
+        x2 = self.down1(x1) 
+        x3 = self.down2(x2) 
+        x4 = self.down3(x3) 
+        x = self.up1(x4, x3) 
+        x = self.up2(x, x2) 
+        x = self.up3(x, x1) 
+        out = self.outc(x)
         x_adv = torch.clamp(image + out, min=-1, max=1)
-
         return x_adv, out
+
 
 
 def compute_loss(model_outputs, labels):
@@ -364,28 +400,14 @@ def transform_train(
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
-    (
-        model,
-        checkpoint_epoch,
-        model_perturbed,
-        checkpoint_epoch_perturbed,
-    ) = init_models_pairs(
-        arch,
-        in_channels,
-        precision,
-        True,
-        checkpoint_path,
-        fl,
-        ber,
-        pos,
-        seed=seed,
-    )
+    # Initialization clean and perturbed model
+    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos, dataset=dataset)
+    create_faults(precision, ber, pos, seed=seed)
+    model, model_perturbed =  model.to(device), model_perturbed.to(device)
 
     print('Seed: {}'.format(seed))
 
     storeLoss = []
-
-    tmpTrainLoader = copy.deepcopy(trainloader)
 
     model_np = copy.deepcopy(model) # Inference origin images
 
@@ -413,7 +435,7 @@ def transform_train(
     '''
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=2000, gamma=cfg.decay
+        optimizer, step_size=500, gamma=cfg.decay
     )
 
     lb = cfg.lb  # Lambda
@@ -424,7 +446,8 @@ def transform_train(
     print('========== Check setting: Epoch: {}, Batch_size: {}, Lambda: {}, BitErrorRate: {}, LR: {}=========='.format(cfg.epochs, cfg.batch_size, lb, ber, cfg.learning_rate))
     print("========== Start training the parameter of the input transform by using one specific perturbed model ==========")
 
-    model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
+    # model_np, model, model_perturbed = model_np.to(device), model.to(device), model_perturbed.to(device)
+    # model, model_perturbed = model.to(device), model_perturbed.to(device)
 
     # Hook the post-output activation for each layers.
     activation_c, activation_p = {}, {}
@@ -439,7 +462,11 @@ def transform_train(
     activationDiffDict = {}
     activationCleanDict = {}
     activationPerturbedDict = {}
-    
+        
+    # Reset the BitErrorMap for different perturbed models.
+    fmap.BitErrorMap0to1 = None 
+    fmap.BitErrorMap1to0 = None
+
     for epoch in range(cfg.epochs):
         running_loss = 0
         running_correct_orig = 0
@@ -480,7 +507,8 @@ def transform_train(
             image_adv = image_adv.to(device)
 
             # model inference
-            _, out, out_biterror = model_np(image), model(image_adv), model_perturbed(image_adv)
+            # _, out, out_biterror = model_np(image), model(image_adv), model_perturbed(image_adv)
+            out, out_biterror = model(image_adv), model_perturbed(image_adv)
 
             # Calculate the loss
             loss_orig, pred_orig = compute_loss(out, label)
@@ -537,8 +565,13 @@ def transform_train(
         # Save the Generator model
         if (epoch + 1) % 50 == 0 or (epoch + 1) == cfg.epochs:
             # Saving the result of the generator!
-            torch.save(Gen,
-                cfg.save_dir + 'Single_GeneratorV9_arch_{}_LR{}_E_{}_ber_{}_lb_{}_NOWE_{}.pt'.format(arch, cfg.learning_rate, cfg.epochs, ber, lb, epoch+1))
+            torch.save(Gen.state_dict(),
+                cfg.save_dir + 'Single_GeneratorV1_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_BS_{}_NOWE_{}_step500.pt'.format(dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.batch_size, epoch+1))
+
+            # Draw learning curve:
+            plt.plot([e+1 for e in range(epoch + 1)], storeLoss)
+            plt.title('Learning Curve')
+            plt.savefig(cfg.save_dir + 'Single_GeneratorV1_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_BS_{}_step500_Learning_Curve.jpg'.format(dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.batch_size))
 
     '''
     # For the final testing!
@@ -561,15 +594,19 @@ def transform_train(
 
     '''
 
-    # Draw learning curve:
-    plt.plot([e+1 for e in range(cfg.epochs)], storeLoss)
-    plt.title('Learning Curve')
-    plt.savefig(cfg.save_dir + 'Learning_Curve.jpg')
+    
 
     print('========== Start checking the accuracy with different perturbed model ==========')
 
-    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=seed)
-    model, model_perturbed = model.to(device), model_perturbed.to(device)
+    # Initialization clean and perturbed model
+    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos, dataset=dataset)
+    create_faults(precision, ber, pos, seed=seed)
+    model, model_perturbed =  model.to(device), model_perturbed.to(device)
+
+    # Reset the BitErrorMap for different perturbed models.
+    fmap.BitErrorMap0to1 = None 
+    fmap.BitErrorMap1to0 = None
+
     model.eval()
     model_perturbed.eval()
     Gen.eval()

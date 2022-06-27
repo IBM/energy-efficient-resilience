@@ -34,7 +34,7 @@ if cfg.machine == 'TWCC':
         "/home/u7590150/dataset"
     )
     cfg.model_dir = (
-        "model_weights/asymmetric_unsigned/"
+        "model_weights/symmetric_signed/"
     )
     cfg.save_dir = (
         "/home/u7590150/tmp/"
@@ -47,7 +47,7 @@ else:
         "/home/haolun/dataset"
     )
     cfg.model_dir = (
-        "model_weights/asymmetric_unsigned/"
+        "model_weights/symmetric_signed/"
     )
     cfg.save_dir = (
         "/home/haolun/tmp/"
@@ -81,7 +81,7 @@ cfg.totalRandom = True # True: Sample perturbed models in the range cfg.randomRa
 cfg.layerwise = False # True: Layerwise training / False: Normal training
 
 # For transform adversarial
-cfg.alpha = 1e-3
+cfg.alpha = 1
 cfg.PGD_STEP = 1
 
 # For transform generalization testing:
@@ -89,7 +89,7 @@ cfg.beginSeed = 50000
 cfg.endSeed = 50010
 
 # For transform_eval
-cfg.testing_mode = 'generator_base' # random_bit_error / adversarial / activation / generator_base
+cfg.testing_mode = 'generator_base' # clean / random_bit_error / adversarial / activation / generator_base
 cfg.P_PATH = '/home/haolun/energy-efficient-resilience_dev/activation_p/Activation_test_arch_resnet18_LR_p0.00075_E_5_ber_0.01_lb_0.01_X+P_NowE5.pt'
-cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev/eopm_p_gen/EOPM_GeneratorV1_arch_resnet18_LR0.05_E_100_ber_0.01_lb_1.0_NOWE_99.pt'
+cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev_forRandomImprove/generatorBackup/EOPM_GeneratorV1_arch_resnet18_LR0.001_E_300_ber_0.01_lb_5.0_N_10_step1000_NOWE_300.pt'
 

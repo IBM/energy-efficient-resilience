@@ -237,65 +237,87 @@ def quantization(model_weights, precision=8):
     delta = max_val / (2 ** (precision - 1) - 1)
     return delta
 
-def bitErrorAttack(allParam, allGrads, allDeleta, topK, alpha, precision, device):
+def bitErrorAttack(allParamClean, allParamPerturb, allGrads, allDeleta, topK, alpha, precision, device):
     # sumDiff = 0
     for idx in topK:
-        changeParamTmp = allParam[idx] + alpha * allGrads[idx] # Apply gradients ascent
-        changeParamTmp = torch.clamp(changeParamTmp, min=-128*allDeleta[idx], max=127*allDeleta[idx]) # clamp the weights into correct range
+        changeParamTmp = allParamPerturb[idx] + alpha * allGrads[idx] # Apply gradients ascent on perturbed weights, and set it temp variable.
+        changeParamTmp = torch.clamp(changeParamTmp, min=-128*allDeleta[idx], max=127*allDeleta[idx]) # Clamp the perturbed weights into correct range.
         
-        changeParam_orig_q = torch.round((allParam[idx] / allDeleta[idx])) # Quantized the updated weights by using symmetric-signed.
-        changeParam_orig_q = changeParam_orig_q.to(torch.int8)
-        changeParam_q = torch.round((changeParamTmp / allDeleta[idx])) # Quantized the updated weights by using symmetric-signed.
+        cleanParam_q = torch.round((allParamClean[idx] / allDeleta[idx])) # Quantized the weights from the clean model by using symmetric-signed.
+        cleanParam_q = cleanParam_q.to(torch.int8)
+        changeParam_q = torch.round((changeParamTmp / allDeleta[idx])) # Quantized the weights of the perturbed model by using symmetric-signed.
         changeParam_q = changeParam_q.to(torch.int8)
         
-        mask = 2**torch.arange(precision-1,-1,-1).to(device) # Change the perturbed weights into byte. Reference: https://stackoverflow.com/questions/55918468/convert-integer-to-pytorch-tensor-of-binary-bits
-        bit_orig = changeParam_orig_q.unsqueeze(-1).bitwise_and(mask).ne(0).byte()
-        bit_tmp = changeParam_q.unsqueeze(-1).bitwise_and(mask).ne(0).byte()
-        # print("Origin bit_orig: {}".format(bit_orig))
+        # Change the perturbed weights into byte. Reference: https://stackoverflow.com/questions/55918468/convert-integer-to-pytorch-tensor-of-binary-bits
+        # Because only one bit can be changed in the perturbed weights. Therefore, the bit presentation from perturbed weights should be compared with the bit presentation from clean weights.
+        mask = 2**torch.arange(precision-1, -1, -1).to(device) # Define the mask.
+        bit_clean = cleanParam_q.unsqueeze(-1).bitwise_and(mask).ne(0).byte() # bitwise presentation from clean weights.
+        bit_tmp = changeParam_q.unsqueeze(-1).bitwise_and(mask).ne(0).byte() # bitwise presentation from perturbed weights.
+        # print("Origin bit_clean: {}".format(bit_clean))
         # print("Origin bit_tmp: {}".format(bit_tmp))
         flag = True
         for i in range(8):
-            if flag and bit_orig[i] != bit_tmp[i]: # Change only the left-most different bit for final attack.
+            if flag and bit_clean[i] != bit_tmp[i]: # Change only the left-most different bit for final attack.
                 flag = False
             else:
-                bit_tmp[i] = bit_orig[i] # Otherwise,  remain the same.
+                bit_tmp[i] = bit_clean[i] # Otherwise,  remain the same.
         # print("Afrer change bit_tmp: {}".format(bit_tmp))
         bit_tmp = bit_tmp.to(torch.int8) 
         bit_tmp = torch.sum(mask * bit_tmp, -1) # Change back to int.
-        # print("different: {}".format(allParam[idx] - bit_tmp * allDeleta[idx]))
-        # sumDiff += torch.sum(allParam[idx] - bit_tmp * allDeleta[idx]).abs()
-        allParam[idx] = bit_tmp * allDeleta[idx] # Dequantized the perturbed weights.
+        # print("different: {}".format(allParamPerturb[idx] - bit_tmp * allDeleta[idx]))
+        # sumDiff += torch.sum(allParamPerturb[idx] - bit_tmp * allDeleta[idx]).abs()
+        allParamPerturb[idx] = bit_tmp * allDeleta[idx] # Dequantized the perturbed weights and set the results to perturbed models.
     
     # print("Inner diff: {}".format(sumDiff))
         
-    return allParam
+    return allParamPerturb
 
 
-def pgd(model_p, alpha, precision, device):
-    allGrads = None
-    allParam = None
-    allDeleta = None
-    storeParamNum = []
+def pgd(model_origin, model_p, alpha, precision, device):
+
+    """
+    Apply PGD attack on the model weights.
+    Only K weights can be attacked.
+    And only one bit can be attacked on each perturbed weights.
+    So, choose top-K gradients to update the weights.
     
-    for name_p, param_p in model_p.named_parameters():
+    :param model_origin: The clean model.
+    :param model_p: The perturbed model.
+    :param alpha: The step update the perturbed weights.
+    :param precision: An int. The number of bits would be used to quantize the model.
+    :param device: Specify GPU usage.
+    """
+    
+    allParamClean = None # Store the flatten clean weights.
+    allParam = None # Store the flatten perturbed weights.
+    allGrads = None # Store the gradients that will be used to update the weights of the perturbed model.
+    allDeleta = None # Store the quantization scale of the each weights. deleta = max_weights / (2 ** (precision - 1) - 1)
+    storeParamNum = [] # Store how many weights in each layer. This is for reshaping the weights.
+    
+    # Store the flatten weights and gradient first:
+    for (name_origin, param_origin), (name_p, param_p) in zip(model_origin.named_parameters(), model_p.named_parameters()):
         if not 'bn' in name_p:
             delta = quantization(param_p.data)
             ParamNum = torch.numel(param_p.grad.data)
             storeParamNum.append(ParamNum)
-            flattenGrads = torch.flatten(param_p.grad.data)
+            flattenParamClean = torch.flatten(param_origin.data)
             flattenParam = torch.flatten(param_p.data)
-            if allParam == None:
-                allGrads = flattenGrads
+            flattenGrads = torch.flatten(param_p.grad.data)
+            if allParam == None: # Initial the storage
+                allParamClean = flattenParamClean
                 allParam = flattenParam
+                allGrads = flattenGrads
                 allDeleta = delta.expand(ParamNum)
             else:
-                allGrads = torch.concat((allGrads, flattenGrads))
+                allParamClean = torch.concat((allParamClean, flattenParamClean))
                 allParam = torch.concat((allParam, flattenParam))
+                allGrads = torch.concat((allGrads, flattenGrads))
                 allDeleta = torch.concat((allDeleta, delta.expand(ParamNum)))
 
     # Find top K gradients:
-    topKVal, topKIdx = torch.topk(allGrads.abs(), 500)
-    allParam = bitErrorAttack(allParam, allGrads, allDeleta, topKIdx, alpha, precision, device)
+    topKVal, topKIdx = torch.topk(allGrads.abs(), 3)
+    # Apply attack on weights
+    allParam = bitErrorAttack(allParamClean, allParam, allGrads, allDeleta, topKIdx, alpha, precision, device)
 
     # Replace the new weight into perturbed models.
     countNum = 0
@@ -442,7 +464,7 @@ def transform_train(
                 out_perturb = model_perturbed(image_adv)
                 loss_pgd, pred_pgd = compute_loss(out_perturb, label)
                 loss_pgd.backward()
-                pgd(model_perturbed, cfg.alpha, precision, device)
+                pgd(model, model_perturbed, cfg.alpha, precision, device)
                 # print(loss_pgd)
                 # sumDiff = 0
                 # for param_a, param_p in zip(model.parameters(), model_perturbed.parameters()):
@@ -564,7 +586,7 @@ def transform_train(
         out_perturb = model_perturbed(image_adv)
         loss_pgd, pred_pgd = compute_loss(out_perturb, label)
         loss_pgd.backward()
-        pgd(model_perturbed, cfg.alpha, precision, device)
+        pgd(model, model_perturbed, cfg.alpha, precision, device)
         #print(loss_pgd)
         #for param_a, param_p in zip(model.parameters(), model_perturbed.parameters()):
         #    print(param_p - param_a)

@@ -36,6 +36,12 @@ weight_clamp_values = [
     0.05,
     0.05,
     0.05,
+    0.05,
+    0.05,
+    0.05,
+    0.05,
+    0.05,
+    0.05,
 ]
 fc_weight_clamp = 0.1
 
@@ -45,7 +51,7 @@ class VGG(nn.Module):
         super(VGG, self).__init__()
         self.features = features
         # self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
-        self.avgpool = nn.AvgPool2d(kernel_size=1, stride=1)
+        # self.avgpool = nn.AvgPool2d(kernel_size=2, stride=1)
         self.classifier = classifier
         # self.classifier = nn.Sequential(
         #     nn.Linear(512 * 7 * 7, 4096),
@@ -61,7 +67,8 @@ class VGG(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
-        x = self.avgpool(x)
+        # x = self.avgpool(x)
+        x = nn.AvgPool2d(kernel_size=x.shape[3], stride=1)(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
@@ -87,8 +94,6 @@ def make_classifier(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     if "linear" in faulty_layers:
@@ -97,8 +102,6 @@ def make_classifier(
             classes,
             precision,
             fc_weight_clamp,
-            BitErrorMap0to1=BitErrorMap0to1,
-            BitErrorMap1to0=BitErrorMap1to0,
         )
     else:
         classifier = zs_quantized_ops.nnLinearSymQuant_op(
@@ -115,8 +118,6 @@ def make_layers(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     layers = []
@@ -137,8 +138,6 @@ def make_layers(
                     bias=True,
                     precision=precision,
                     clamp_val=weight_clamp_values[cl],
-                    BitErrorMap0to1=BitErrorMap0to1,
-                    BitErrorMap1to0=BitErrorMap1to0,
                 )
             else:
                 conv2d = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -240,8 +239,6 @@ def vggf(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     model = VGG(
@@ -252,8 +249,6 @@ def vggf(
             precision=precision,
             ber=ber,
             position=position,
-            BitErrorMap0to1=BitErrorMap0to1,
-            BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
         ),
         make_classifier(
@@ -261,8 +256,6 @@ def vggf(
             precision,
             ber,
             position,
-            BitErrorMap0to1,
-            BitErrorMap1to0,
             faulty_layers,
         ),
         classes,

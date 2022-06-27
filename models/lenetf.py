@@ -31,8 +31,6 @@ class LeNet(nn.Module):
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     ):
         super(LeNet, self).__init__()
@@ -46,8 +44,6 @@ class LeNet(nn.Module):
                 bias=True,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
             self.conv2 = zs_faultinjection_ops.nnConv2dPerturbWeight_op(
                 32,
@@ -58,8 +54,6 @@ class LeNet(nn.Module):
                 bias=True,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv1 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -88,16 +82,12 @@ class LeNet(nn.Module):
                 128,
                 precision,
                 fc_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
             self.fc2 = zs_faultinjection_ops.nnLinearPerturbWeight_op(
                 128,
                 classes,
                 precision,
                 conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.fc1 = zs_quantized_ops.nnLinearSymQuant_op(
@@ -134,8 +124,6 @@ def lenetf(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     model = LeNet(
@@ -144,8 +132,6 @@ def lenetf(
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     )
     return model

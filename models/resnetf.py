@@ -40,8 +40,6 @@ class BasicBlock(nn.Module):
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
         attack=False,
     ):
@@ -57,8 +55,6 @@ class BasicBlock(nn.Module):
                 bias=False,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv1 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -82,8 +78,6 @@ class BasicBlock(nn.Module):
                 bias=False,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv2 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -112,8 +106,6 @@ class BasicBlock(nn.Module):
                         bias=False,
                         precision=precision,
                         clamp_val=conv_clamp_val,
-                        BitErrorMap0to1=BitErrorMap0to1,
-                        BitErrorMap1to0=BitErrorMap1to0,
                     ),
                     nn.BatchNorm2d(self.expansion * planes),
                 )
@@ -150,8 +142,6 @@ class Bottleneck(nn.Module):
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
         attack=False,
     ):
@@ -167,8 +157,6 @@ class Bottleneck(nn.Module):
                 bias=False,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv1 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -192,8 +180,6 @@ class Bottleneck(nn.Module):
                 bias=False,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv2 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -217,8 +203,6 @@ class Bottleneck(nn.Module):
                 bias=False,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv3 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -248,8 +232,6 @@ class Bottleneck(nn.Module):
                         bias=False,
                         precision=precision,
                         clamp_val=conv_clamp_val,
-                        BitErrorMap0to1=BitErrorMap0to1,
-                        BitErrorMap1to0=BitErrorMap1to0,
                     ),
                     nn.BatchNorm2d(self.expansion * planes),
                 )
@@ -286,8 +268,6 @@ class ResNet(nn.Module):
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     ):
         super(ResNet, self).__init__()
@@ -304,8 +284,6 @@ class ResNet(nn.Module):
                 bias=False,
                 precision=precision,
                 clamp_val=conv_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.conv1 = zs_quantized_ops.nnConv2dSymQuant_op(
@@ -327,8 +305,6 @@ class ResNet(nn.Module):
             precision=precision,
             ber=ber,
             position=position,
-            BitErrorMap0to1=BitErrorMap0to1,
-            BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
             attack = (True if 'l1' in faulty_layers else False)
         )
@@ -340,8 +316,6 @@ class ResNet(nn.Module):
             precision=precision,
             ber=ber,
             position=position,
-            BitErrorMap0to1=BitErrorMap0to1,
-            BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
             attack = (True if 'l2' in faulty_layers else False)
         )
@@ -353,8 +327,6 @@ class ResNet(nn.Module):
             precision=precision,
             ber=ber,
             position=position,
-            BitErrorMap0to1=BitErrorMap0to1,
-            BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
             attack = (True if 'l3' in faulty_layers else False)
         )
@@ -366,8 +338,6 @@ class ResNet(nn.Module):
             precision=precision,
             ber=ber,
             position=position,
-            BitErrorMap0to1=BitErrorMap0to1,
-            BitErrorMap1to0=BitErrorMap1to0,
             faulty_layers=faulty_layers,
             attack = (True if 'l4' in faulty_layers else False)
         )
@@ -377,8 +347,6 @@ class ResNet(nn.Module):
                 num_classes,
                 precision,
                 fc_clamp_val,
-                BitErrorMap0to1=BitErrorMap0to1,
-                BitErrorMap1to0=BitErrorMap1to0,
             )
         else:
             self.linear = zs_quantized_ops.nnLinearSymQuant_op(
@@ -394,8 +362,6 @@ class ResNet(nn.Module):
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
         attack = False
     ):
@@ -410,8 +376,6 @@ class ResNet(nn.Module):
                     precision,
                     ber,
                     position,
-                    BitErrorMap0to1,
-                    BitErrorMap1to0,
                     faulty_layers,
                     attack,
                 )
@@ -425,7 +389,7 @@ class ResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        out = F.avg_pool2d(out, out.shape[3])
         out = out.view(out.size(0), -1)
         out = self.linear(out)
         return out
@@ -436,8 +400,6 @@ def ResNet18(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     return ResNet(
@@ -447,8 +409,6 @@ def ResNet18(
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     )
 
@@ -458,8 +418,6 @@ def ResNet34(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     return ResNet(
@@ -469,8 +427,6 @@ def ResNet34(
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     )
 
@@ -479,8 +435,6 @@ def ResNet50(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     return ResNet(
@@ -490,8 +444,6 @@ def ResNet50(
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     )
 
@@ -500,8 +452,6 @@ def ResNet101(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     return ResNet(
@@ -511,8 +461,6 @@ def ResNet101(
         precision,
         ber,
         position,
-        BitErrorMap0to1,
-        BitErrorMap1to0,
         faulty_layers,
     )
 
@@ -523,8 +471,6 @@ def resnetf(
     precision,
     ber,
     position,
-    BitErrorMap0to1,
-    BitErrorMap1to0,
     faulty_layers,
 ):
     if arch == "resnet18":
@@ -533,8 +479,6 @@ def resnetf(
             precision,
             ber,
             position,
-            BitErrorMap0to1,
-            BitErrorMap1to0,
             faulty_layers,
         )
     elif arch == "resnet34":
@@ -543,8 +487,6 @@ def resnetf(
             precision,
             ber,
             position,
-            BitErrorMap0to1,
-            BitErrorMap1to0,
             faulty_layers,
         )
     elif arch == "resnet50":
@@ -553,8 +495,6 @@ def resnetf(
             precision,
             ber,
             position,
-            BitErrorMap0to1,
-            BitErrorMap1to0,
             faulty_layers,
         )
     elif arch == "resnet101":
@@ -563,8 +503,6 @@ def resnetf(
             precision,
             ber,
             position,
-            BitErrorMap0to1,
-            BitErrorMap1to0,
             faulty_layers,
         )
 

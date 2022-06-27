@@ -18,6 +18,7 @@ import torch
 
 from config import cfg
 from faultmodels import randomfault
+import faultsMap as fmap
 
 from .lenet import lenet  # noqa: F401
 from .lenetf import lenetf  # noqa: F401
@@ -27,27 +28,52 @@ from .simplenet import simplenet  # noqa: F401
 from .vgg import vgg  # noqa: F401
 from .vggf import vggf  # noqa: F401
 
+# Create the fault map from randomfault module.
+def create_faults(
+    precision,
+    bit_error_rate,
+    position,
+    seed=0,
+):
+    rf = randomfault.RandomFaultModel(
+        bit_error_rate, precision, position, seed=seed
+    )
+    fmap.BitErrorMap0 = (
+        torch.tensor(rf.BitErrorMap_flip0).to(torch.int32).to(cfg.device)
+    )
+    fmap.BitErrorMap1 = (
+        torch.tensor(rf.BitErrorMap_flip1).to(torch.int32).to(cfg.device)
+    )
 
-def init_models(arch, in_channels, precision, retrain, checkpoint_path):
+
+def init_models(arch, in_channels, precision, retrain, checkpoint_path, dataset='cifar'):
 
     """
     Default model loader
     """
+    classes = 10
+    if dataset == 'cifar':
+        classes = 10
+    elif dataset == 'tinyimagenet':
+        classes = 200
+
 
     if arch == "vgg11":
-        model = vggf("A", in_channels, 10, True, precision, 0, 0, 0, 0, [])
+        model = vggf("A", in_channels, classes, True, precision, 0, 0, [])
     elif arch == "vgg16":
-        model = vggf("D", in_channels, 10, True, precision, 0, 0, 0, 0, [])
+        model = vggf("D", in_channels, classes, True, precision, 0, 0, [])
+    elif arch == "vgg19":
+        model = vggf("E", in_channels, classes, True, precision, 0, 0, [])
     elif arch == "resnet18":
-        model = resnetf("resnet18", 10, precision, 0, 0, 0, 0, [])
+        model = resnetf("resnet18", classes, precision, 0, 0, [])
     elif arch == "resnet34":
-        model = resnetf("resnet34", 10, precision, 0, 0, 0, 0, [])
+        model = resnetf("resnet34", classes, precision, 0, 0, [])
     elif arch == "resnet50":
-        model = resnetf("resnet50", 10, precision, 0, 0, 0, 0, [])
+        model = resnetf("resnet50", classes, precision, 0, 0, [])
     elif arch == "resnet101":
-        model = resnetf("resnet101", 10, precision, 0, 0, 0, 0, [])
+        model = resnetf("resnet101", classes, precision, 0, 0, [])
     else:
-        model = lenetf(in_channels, 10, precision, 0, 0, 0, 0, [])
+        model = lenetf(in_channels, classes, precision, 0, 0, [])
 
     # print(model)
     checkpoint_epoch = -1
@@ -85,6 +111,7 @@ def init_models_faulty(
     bit_error_rate,
     position,
     seed=0,
+    dataset='cifar',
 ):
 
     """
@@ -98,94 +125,91 @@ def init_models_faulty(
     else:
         """Perturbed models, where the weights are injected with bit
         errors at the rate of ber at the specified positions"""
-        rf = randomfault.RandomFaultModel(
-            bit_error_rate, precision, position, seed
-        )
-        BitErrorMap0 = (
-            torch.tensor(rf.BitErrorMap_flip0).to(torch.int32).to(cfg.device)
-        )
-        BitErrorMap1 = (
-            torch.tensor(rf.BitErrorMap_flip1).to(torch.int32).to(cfg.device)
-        )
+        
+        classes = 0
+        if dataset == 'cifar':
+            classes = 10
+        elif dataset == 'tinyimagenet':
+            classes = 200
+        else:
+            classes = 10
+        
         if arch == "vgg11":
             model = vggf(
                 "A",
                 in_channels,
-                10,
+                classes,
                 True,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
                 faulty_layers,
             )
         elif arch == "vgg16":
             model = vggf(
                 "D",
                 in_channels,
-                10,
+                classes,
                 True,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
                 faulty_layers,
             )
-        elif arch == "resnet18":
-            model = resnetf(
-                "resnet18",
-                10,
+        elif arch == "vgg19":
+            model = vggf(
+                "E",
+                in_channels,
+                classes,
+                True,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
+                faulty_layers,
+            )    
+        elif arch == "resnet18":
+            model = resnetf(
+                "resnet18",
+                classes,
+                precision,
+                bit_error_rate,
+                position,
                 faulty_layers,
             )
         elif arch == "resnet34":
             model = resnetf(
                 "resnet34",
-                10,
+                classes,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
                 faulty_layers,
             )
         elif arch == "resnet50":
             model = resnetf(
                 "resnet50",
-                10,
+                classes,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
                 faulty_layers,
             )
         elif arch == "resnet101":
             model = resnetf(
                 "resnet101",
-                10,
+                classes,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
                 faulty_layers,
             )
         else:
             model = lenetf(
                 in_channels,
-                10,
+                classes,
                 precision,
                 bit_error_rate,
                 position,
-                BitErrorMap0,
-                BitErrorMap1,
                 faulty_layers,
             )
 
@@ -225,12 +249,13 @@ def init_models_pairs(
     bit_error_rate,
     position,
     seed=0,
+    dataset='cifar'
 ):
 
     """Load the default model as well as the corresponding perturbed model"""
 
     model, checkpoint_epoch = init_models(
-        arch, in_channels, precision, retrain, checkpoint_path
+        arch, in_channels, precision, retrain, checkpoint_path, dataset=dataset
     )
     model_p, checkpoint_epoch_p = init_models_faulty(
         arch,
@@ -242,6 +267,7 @@ def init_models_pairs(
         bit_error_rate,
         position,
         seed=seed,
+        dataset=dataset,
     )
 
     return model, checkpoint_epoch, model_p, checkpoint_epoch_p

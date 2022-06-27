@@ -18,7 +18,8 @@ from torch.nn.parameter import Parameter
 from collections import OrderedDict
 
 from config import cfg
-from models import init_models_pairs
+from models import init_models_pairs, create_faults, init_models
+import faultsMap as fmap
 import itertools
 import numpy as np
 import copy
@@ -60,6 +61,72 @@ class Program(nn.Module):
         x_adv = torch.clamp(x_adv, min=-1, max=1)
 
         return x_adv
+
+'''
+class Generator(nn.Module):
+    """
+    Apply reprogramming.
+    """
+
+    def __init__(self, cfg):
+        super(Generator, self).__init__()
+        self.cfg = cfg
+        self.num_classes = 10
+
+        # Encoder
+        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
+        # torch.nn.init.xavier_uniform(self.conv1_1.weight)
+        self.bn1_1 = nn.BatchNorm2d(32)
+        self.relu1_1 = nn.ReLU()
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+        
+        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
+        # torch.nn.init.xavier_uniform(self.conv2_1.weight)
+        self.bn2_1 = nn.BatchNorm2d(64)
+        self.relu2_1 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+
+        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
+        # torch.nn.init.xavier_uniform(self.conv3_1.weight)
+        self.bn3_1 = nn.BatchNorm2d(64)
+        self.relu3_1 = nn.ReLU()
+        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
+
+        self.dconv4_1 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=4, stride=2, padding=1)
+        # torch.nn.init.xavier_uniform(self.dconv4_1.weight)
+        self.bn4_1 = nn.BatchNorm2d(64)
+        self.relu4_1 = nn.ReLU()
+
+        self.dconv5_1 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1)
+        # torch.nn.init.xavier_uniform(self.dconv5_1.weight)
+        self.bn5_1 = nn.BatchNorm2d(32)
+        self.relu5_1 = nn.ReLU()
+
+        self.dconv6_1 = nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=4, stride=2, padding=1)
+        # torch.nn.init.xavier_uniform(self.dconv6_1.weight)
+        self.bn6_1 = nn.BatchNorm2d(3)
+        self.tanh = torch.nn.Tanh()
+
+    def forward(self, image):
+        img = image.data.clone()
+        # Encoder
+        x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
+        x = self.maxpool1(x)
+        x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
+        x = self.maxpool2(x)
+        x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
+        x = self.maxpool3(x)
+
+        # Decoder
+        x = self.relu4_1(self.bn4_1(self.dconv4_1(x)))
+        x = self.relu5_1(self.bn5_1(self.dconv5_1(x)))
+        x = self.bn6_1(self.dconv6_1(x))
+        out = self.tanh(x)
+
+        x_adv = torch.clamp(image + out, min=-1, max=1)
+
+        return x_adv
+'''
 
 class Generator(nn.Module):
     """
@@ -126,6 +193,7 @@ class Generator(nn.Module):
         self.tanh = torch.nn.Tanh()
 
 
+
     def forward(self, image):
         img = image.data.clone()
         # Encoder
@@ -163,6 +231,53 @@ def compute_loss(model_outputs, labels):
     )  # changing the size from (batch_size,1) to batch_size.
     loss = nn.CrossEntropyLoss()(model_outputs, labels)
     return loss, preds
+
+def accuracy_checking_clean(
+    model_orig, trainloader, testloader, device):
+    """
+      Calculating the accuracy with given clean model and perturbed model.
+      :param model_orig: Clean model.
+      :param model_p: Perturbed model.
+      :param trainloader: The loader of training data.
+      :param testloader: The loader of testing data.
+      :param transform_model: The object of transformation model.
+      :param device: Specify GPU usage.
+      :use_transform: Should apply input transformation or not.
+    """
+    cfg.replaceWeight = False
+    total_train = 0
+    total_test = 0
+    correct_orig_train = 0
+    correct_p_train = 0
+    correct_orig_test = 0
+    correct_p_test = 0
+
+    # For training data:
+    for x, y in trainloader:
+        total_train += 1
+        x, y = x.to(device), y.to(device)
+        out_orig = model_orig(x)
+        _, pred_orig = out_orig.max(1)
+        y = y.view(y.size(0))
+        correct_orig_train += torch.sum(pred_orig == y.data).item()
+    accuracy_orig_train = correct_orig_train / (len(trainloader.dataset))
+
+    # For testing data:
+    for x, y in testloader:
+        total_test += 1
+        x, y = x.to(device), y.to(device)
+        out_orig = model_orig(x)
+        _, pred_orig = out_orig.max(1)
+        y = y.view(y.size(0))
+        correct_orig_test += torch.sum(pred_orig == y.data).item()
+    accuracy_orig_test = correct_orig_test / (len(testloader.dataset))
+
+    print(
+        "Accuracy of training data: clean model: {:5f}".format(accuracy_orig_train)
+    )
+    print(
+        "Accuracy of testing data: clean model: {:5f}".format(accuracy_orig_test)
+    )
 
 
 def accuracy_checking(
@@ -293,6 +408,14 @@ def transform_eval(
     Pg.to(device)
     Pg.eval()
     print('Successfully load input transformation parameter!')
+
+    if(cfg.testing_mode == 'clean'):
+        model, checkpoint_epoch = init_models(arch, 3, precision, True, checkpoint_path, dataset)
+
+        model = model.to(device)
+        model.eval()
+        accuracy_checking_clean(model, trainloader, testloader, device)
+
 
     if(cfg.testing_mode == 'random_bit_error'):
         print('========== Start checking the accuracy with different perturbed model: bit error mode ==========')
@@ -480,8 +603,10 @@ def transform_eval(
 
 
     if(cfg.testing_mode == 'generator_base'):
-        
-        Gen = torch.load(cfg.G_PATH)
+        Gen = Generator(cfg)
+        Gen.load_state_dict(torch.load(cfg.G_PATH))
+        # Gen = torch.load(cfg.G_PATH)
+        Gen = Gen.to(device)
         print('Successfully loading the generator model.')
 
         print('========== Start checking the accuracy with different perturbed model: bit error mode ==========')
@@ -502,6 +627,9 @@ def transform_eval(
             (model, checkpoint_epoch, model_perturbed, checkpoint_epoch_perturbed) = init_models_pairs( 
                         arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=i)
             model, model_perturbed = model.to(device), model_perturbed.to(device),
+            fmap.BitErrorMap0to1 = None 
+            fmap.BitErrorMap1to0 = None
+            create_faults(precision, ber, pos, seed=i)
             model.eval()
             model_perturbed.eval()
             Gen.eval()

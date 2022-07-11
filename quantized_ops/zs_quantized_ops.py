@@ -23,6 +23,7 @@ https://pytorch.org/docs/stable/_modules/torch/nn/modules/linear.html
 
 import torch
 import torch.nn.functional as F
+from config import cfg
 from torch import nn
 from torch.nn.modules.utils import _pair
 
@@ -113,6 +114,7 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
         # quantization aware training.
         # So, we don't use input.copy_(input_dq) to replace self.weight with
         # input_dq.
+
         return input_dq
 
     # Straight-through-estimator in backward pass
@@ -211,6 +213,7 @@ class nnConv2dSymQuant(nn.Conv2d):
             quant_weight = quantWeight(
                 self.weight, self.precision, self.clamp_val
             )
+            
         return F.conv2d(
             input,
             quant_weight,
@@ -242,6 +245,83 @@ def nnConv2dSymQuant_op(
         groups=1,
         bias=bias,
         padding_mode="zeros",
+        precision=precision,
+        clamp_val=clamp_val,
+    )
+
+class nnConvTranspose2dSymQuant(nn.ConvTranspose2d): 
+    """
+    Computes 2d convtranspose output
+    Weights are quantized and dequantized introducing a quantization error
+    """
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=1,
+        dilation=1,
+        groups=1,
+        bias=True,
+        precision=-1,
+        clamp_val=0.5,
+    ):
+        kernel_size = _pair(kernel_size)
+        stride = _pair(stride)
+        padding = _pair(padding)
+        dilation = _pair(dilation)
+
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups,
+            bias,
+        )
+        self.precision = precision
+        self.clamp_val = clamp_val
+
+    def forward(self, input):
+        if self.precision > 0:
+            quantWeight = SymmetricQuantizeDequantize.apply
+            quant_weight = quantWeight(
+                self.weight, self.precision, self.clamp_val
+            )
+            
+        return F.conv_transpose2d(
+            input = input,
+            weight = quant_weight,
+            bias = self.bias,
+            stride = self.stride,
+            padding = self.padding,
+            groups = self.groups,
+            dilation = self.dilation
+        )
+
+def nnConvTranspose2dSymQuant_op(
+    in_channels,
+    out_channels,
+    kernel_size,
+    stride,
+    padding,
+    bias,
+    precision,
+    clamp_val,
+):
+    return nnConvTranspose2dSymQuant(
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=stride,
+        padding=padding,
+        dilation=1,
+        groups=1,
+        bias=bias,
         precision=precision,
         clamp_val=clamp_val,
     )

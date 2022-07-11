@@ -57,9 +57,11 @@ command you need to execute before starting the experiments.
 Files
 -------
 - zs_train_input_transform_single : Train on one specific perturbed model. Support normal / layerwise training.
-- zs_train_input_transform_eopm : Train by using EOPM attack. Support normal / layerwise training.
-- zs_train_input_transform_mlp_eopm : (NN-based) Train by using EOPM attack. 
-- zs_train_input_transform_adversarial : Train by using adversarial training. Support normal / layerwise training.
+- zs_train_input_transform_eopm : Trained by using EOPM attack. Support normal / layerwise training.
+- zs_train_input_transform_mlp_eopm : (NN-based) Trained by using EOPM attack. 
+- zs_train_input_transform_eopm_gen : Generator is trained by using EOPM attack. Support normal / layerwise training.
+- zs_train_input_transform_adversarial : Trained by using adversarial training. Support normal / layerwise training.
+- zs_train_input_transform_adversarial_gen_bit : Generator is trained by using adversarial bit error attack training. Support normal / layerwise training.
 - zs_train_input_transform_mlp_adversarial : (NN-based) Train by using adversarial training. 
 - zs_train_input_transform_adversarial_w : Train on clean model weights by using adversarial training. 
 - zs_train_input_transform_eval : Evaluate the input transformation.
@@ -89,14 +91,14 @@ zs_main.py resnet18 eval cifar10 -E 10
 For input transformation training, one can excute the Expectation Over Perturbed Model (EOPM) to train the parameter. For LM: the lambda value between clean loss and perturbed loss. For N: how many perturbed model will be used to during training:
 
 ```bash
-python zs_main.py resnet18 transform_eopm cifar10 -ber 0.01 -cp model_weights/resnet18_checkpoints_newresnet18_cifar10_p_8_model_100.pth -E 2 -LR 0.01 -BS 512 -LM 1 -N 100
+python zs_main.py [resnet18 | resnet50 | vgg11 | vgg16 | vgg19] transform_eopm_gen [cifar10 | gtsrb | cifar100] -ber 0.01 -cp [please input the model path here] -E 300 -LR 0.001 -BS 256 -LM 5 -N 10 -G [ConvL | ConvS | DeConvL | DeConvS | UNetL | UNetS]
 ```
 
 
 For adversarial training, one can excute the command below:
 
 ```
-zs_main.py resnet18 transform_adversarial cifar10 -ber 0.01 -cp model_weights/resnet18_checkpoints_newresnet18_cifar10_p_8_model_100.pth -E 5 -LR 0.01 -BS 512 -LM 1 -PGD 1
+python zs_main.py [resnet18 | resnet50 | vgg11 | vgg16 | vgg19] transform_adversarial_gen_bit [ cifar10 | gtsrb | cifar100] -ber 0.01 -cp [model_path] -E 300 -LR 0.001 -BS 256 -LM 5 -PGD 1 -G [ ConvL | ConvS | DeConvL | DeConvS | UNetL | UNetS ]
 ```
 
 Contacts

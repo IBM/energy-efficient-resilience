@@ -16,7 +16,7 @@ import os
 import sys
 
 import torch
-import torch.optim as optim
+import torch.optim as optim 
 from torch import nn
 
 from config import cfg
@@ -26,6 +26,23 @@ __all__ = ["training"]
 
 debug = False
 torch.manual_seed(0)
+
+class WarmUpLR(optim.lr_scheduler._LRScheduler):
+    """warmup_training learning rate scheduler
+    Args:
+        optimizer: optimzier(e.g. SGD)
+        total_iters: totoal_iters of warmup phase
+    """
+    def __init__(self, optimizer, total_iters, last_epoch=-1):
+
+        self.total_iters = total_iters
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        """we will use the first m batches, and set the learning
+        rate to base_lr * m / total_iters
+        """
+        return [base_lr * self.last_epoch / (self.total_iters + 1e-8) for base_lr in self.base_lrs]
 
 
 def training(
@@ -57,12 +74,25 @@ def training(
     :param device: A string. Specify using GPU or CPU.
     """
 
-    model, checkpoint_epoch = init_models(arch, 3, precision, retrain, checkpoint_path) # Quantization Aware Training without using bit error!
+    model, checkpoint_epoch = init_models(arch, 3, precision, retrain, checkpoint_path, dataset) # Quantization Aware Training without using bit error!
 
     print("Training with Learning rate %.4f" % (cfg.learning_rate))
-    opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9)
+
+    if dataset == 'cifar100': 
+        print('cifar100')
+        opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9)
+        #iter_per_epoch = len(trainloader)
+        #warmup_scheduler = WarmUpLR(opt, iter_per_epoch * 1) # warmup = 1
+        train_scheduler = optim.lr_scheduler.MultiStepLR(opt, milestones=[60, 120, 160], gamma=0.2)
+    else:
+        opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9)
 
     model = model.to(device)
+    from torchsummary import summary
+    if dataset == 'tinyimagenet':
+        summary(model, (3, 64, 64))
+    else:
+        summary(model, (3, 32, 32))
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
@@ -73,6 +103,7 @@ def training(
         running_loss = 0.0
         running_correct = 0
         for batch_id, (inputs, outputs) in enumerate(trainloader):
+            
             inputs = inputs.to(device)
             outputs = outputs.to(device)
 
@@ -126,6 +157,13 @@ def training(
 
             # update restored weights with gradient
             opt.step()
+            if dataset == 'cifar100': 
+                train_scheduler.step()
+            #    if x <= 1: # warmup = 1
+            #        warmup_scheduler.step()
+            #    else:
+            #        train_scheduler.step()
+            # lr_scheduler.step()
 
             running_loss += loss.item()
             running_correct += torch.sum(preds == outputs.data)
@@ -139,7 +177,7 @@ def training(
         if (x+1)%10 == 0:
 
             model_path = default_model_path(
-                cfg.model_dir, arch, dataset, precision, fl, ber, pos, x
+                cfg.model_dir, arch, dataset, precision, fl, ber, pos, x+1
             )
 
             if not os.path.exists(os.path.dirname(model_path)):

@@ -78,7 +78,7 @@ def main():
     parser.add_argument(
         "dataset",
         help="Specify dataset",
-        choices=["cifar10", "mnist", "fashion", "tinyimagenet"],
+        choices=["cifar10", "cifar100", "mnist", "fashion", "tinyimagenet", "gtsrb"],
         default="fashion",
     )
     group = parser.add_argument_group(
@@ -171,6 +171,13 @@ def main():
         default=100,
     )
     group.add_argument(
+        "-G",
+        "--Generator",
+        type=str,
+        help="Which generator to be used.",
+        default='large',
+    )
+    group.add_argument(
         "-PGD",
         "--pgd_step",
         type=int,
@@ -185,7 +192,9 @@ def main():
     cfg.test_batch_size = args.test_batch_size
     cfg.lb = args.lambdaVal
     cfg.N = args.N_perturbed_model
+    cfg.G = args.Generator
     cfg.PGD_STEP = args.pgd_step
+    cfg.G = args.Generator
 
 
     # if args.position>args.precision-1:
@@ -194,10 +203,11 @@ def main():
 
     print("Preparing data..", args.dataset)
     if args.dataset == "cifar10":
-        dataset = "cifar"
+        dataset = "cifar10"
         in_channels = 3
         transform_train = transforms.Compose(
             [
+                # transforms.RandomAffine(degrees = 0, translate=(0.2, 0.2), scale=(0.8, 1.2)),
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
@@ -225,6 +235,92 @@ def main():
         testset = torchvision.datasets.CIFAR10(
             root=cfg.data_dir,
             train=False,
+            download=True,
+            transform=transform_test,
+        )
+        testloader = torch.utils.data.DataLoader(
+            testset,
+            batch_size=cfg.test_batch_size,
+            shuffle=False,
+            num_workers=2,
+        )
+    elif args.dataset == "cifar100":
+        dataset = "cifar100"
+        in_channels = 3
+        transform_train = transforms.Compose(
+            [
+                # transforms.RandomAffine(degrees = 0, translate=(0.35, 0.35), scale=(0.65, 1.35)),
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Lambda(lambda t: t * 2 - 1),
+            ]
+        )
+
+        transform_test = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Lambda(lambda t: t * 2 - 1),
+            ]
+        )
+
+        trainset = torchvision.datasets.CIFAR100(
+            root=cfg.data_dir,
+            train=True,
+            download=True,
+            transform=transform_train,
+        )
+        trainloader = torch.utils.data.DataLoader(
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=8
+        )
+
+        testset = torchvision.datasets.CIFAR100(
+            root=cfg.data_dir,
+            train=False,
+            download=True,
+            transform=transform_test,
+        )
+        testloader = torch.utils.data.DataLoader(
+            testset,
+            batch_size=cfg.test_batch_size,
+            shuffle=False,
+            num_workers=2,
+        )
+    elif args.dataset == "gtsrb":
+        dataset = "gtsrb"
+        in_channels = 3
+        transform_train = transforms.Compose(
+            [
+                transforms.Resize((32, 32)),
+                transforms.RandomAffine(degrees = 0, translate=(0.35, 0.35), scale=(0.65, 1.35)),
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Lambda(lambda t: t * 2 - 1),
+            ]
+        )
+
+        transform_test = transforms.Compose(
+            [
+                transforms.Resize((32, 32)),
+                transforms.ToTensor(),
+                transforms.Lambda(lambda t: t * 2 - 1),
+            ]
+        )
+
+        trainset = torchvision.datasets.GTSRB(
+            root=cfg.data_dir,
+            split="train",
+            download=True,
+            transform=transform_train,
+        )
+        trainloader = torch.utils.data.DataLoader(
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=8
+        )
+
+        testset = torchvision.datasets.GTSRB(
+            root=cfg.data_dir,
+            split='test',
             download=True,
             transform=transform_test,
         )

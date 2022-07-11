@@ -25,6 +25,7 @@ import os
 
 from config import cfg
 from models import init_models_pairs, create_faults
+from models.generator import *
 import faultsMap as fmap
 
 
@@ -32,103 +33,6 @@ torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 EPS = 1e-20
 
-
-
-class Generator(nn.Module):
-    """
-    Apply reprogramming.
-    """
-
-    def __init__(self, cfg):
-        super(Generator, self).__init__()
-        self.cfg = cfg
-        self.num_classes = 10
-
-        # Encoder
-        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.bn1_1 = nn.BatchNorm2d(32)
-        self.relu1_1 = nn.ReLU()
-        self.conv1_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.bn1_2 = nn.BatchNorm2d(32)
-        self.relu1_2 = nn.ReLU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
-        
-        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.bn2_1 = nn.BatchNorm2d(64)
-        self.relu2_1 = nn.ReLU()
-        self.conv2_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.bn2_2 = nn.BatchNorm2d(64)
-        self.relu2_2 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
-
-        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.bn3_1 = nn.BatchNorm2d(128)
-        self.relu3_1 = nn.ReLU()
-        self.conv3_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn3_2 = nn.BatchNorm2d(128)
-        self.relu3_2 = nn.ReLU()
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
-
-        
-        self.conv4_1 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn4_1 = nn.BatchNorm2d(128)
-        self.relu4_1 = nn.ReLU()
-        self.upsample4_1 = nn.Upsample(scale_factor=2)
-        self.conv4_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn4_2 = nn.BatchNorm2d(128)
-        self.relu4_2 = nn.ReLU()
-
-        self.conv5_1 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
-        self.bn5_1 = nn.BatchNorm2d(64)
-        self.relu5_1 = nn.ReLU()
-        self.upsample5_1 = nn.Upsample(scale_factor=2)
-        self.conv5_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.bn5_2 = nn.BatchNorm2d(64)
-        self.relu5_2 = nn.ReLU()
-
-        self.conv6_1 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
-        self.relu6_1 = nn.ReLU()
-        self.bn6_1 = nn.BatchNorm2d(32)
-        self.upsample6_1 = nn.Upsample(scale_factor=2)
-        self.conv6_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.bn6_2 = nn.BatchNorm2d(32)
-        self.relu6_2 = nn.ReLU()
-
-        self.convout = nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, padding=1)
-        self.bnout = nn.BatchNorm2d(3)
-        self.tanh = torch.nn.Tanh()
-
-
-
-    def forward(self, image):
-        img = image.data.clone()
-        # Encoder
-        x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
-        x = self.relu1_2(self.bn1_2(self.conv1_2(x)))
-        x = self.maxpool1(x)
-        x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
-        x = self.relu2_2(self.bn2_2(self.conv2_2(x)))
-        x = self.maxpool2(x)
-        x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
-        x = self.relu3_2(self.bn3_2(self.conv3_2(x)))
-        x = self.maxpool3(x)
-
-        # Decoder
-        x = self.relu4_1(self.bn4_1(self.conv4_1(x)))
-        x = self.upsample4_1(x)
-        x = self.relu4_2(self.bn4_2(self.conv4_2(x)))
-        x = self.relu5_1(self.bn5_1(self.conv5_1(x)))
-        x = self.upsample5_1(x)
-        x = self.relu5_2(self.bn5_2(self.conv5_2(x)))
-        x = self.relu6_1(self.bn6_1(self.conv6_1(x)))
-        x = self.upsample6_1(x)
-        x = self.relu6_2(self.bn6_2(self.conv6_2(x)))
-        x = self.bnout(self.convout(x))
-        out = self.tanh(x)
-
-        x_adv = torch.clamp(img + out, min=-1, max=1)
-
-        return x_adv, out
     
 def check_dir(paths):
     for path in paths:
@@ -166,7 +70,7 @@ def accuracy_checking(
         total_train += 1
         x, y = x.to(device), y.to(device)
         if use_transform:
-            x_adv, _ = gen(x)
+            x_adv = gen(x)
             out_orig = model_orig(x_adv)
             out_p = model_p(x_adv)
         else:
@@ -185,7 +89,7 @@ def accuracy_checking(
         total_test += 1
         x, y = x.to(device), y.to(device)
         if use_transform:
-            x_adv, _ = gen(x)
+            x_adv = gen(x)
             out_orig = model_orig(x_adv)
             out_p = model_p(x_adv)
         else:
@@ -237,36 +141,43 @@ def quantization(model_weights, precision=8):
     delta = max_val / (2 ** (precision - 1) - 1)
     return delta
 
+def applyBitAttack(clean, perturbed):
+    return (clean ^ (2 ** torch.floor(torch.log2(clean ^ perturbed))).to(torch.uint8)).to(torch.uint8)
+
 def bitErrorAttack(allParamClean, allParamPerturb, allGrads, allDeleta, topK, alpha, precision, device):
     # sumDiff = 0
-    for idx in topK:
-        changeParamTmp = allParamPerturb[idx] + alpha * allGrads[idx] # Apply gradients ascent on perturbed weights, and set it temp variable.
-        changeParamTmp = torch.clamp(changeParamTmp, min=-128*allDeleta[idx], max=127*allDeleta[idx]) # Clamp the perturbed weights into correct range.
+    mask = torch.zeros(allParamClean.shape).to(device)
+    mask[topK] = 1
+    changeParamTmp = allParamPerturb + alpha * (mask * allGrads) # Apply gradients ascent on perturbed weights, and set it temp variable.
+    changeParamTmp = torch.clamp(changeParamTmp, min=-128*allDeleta, max=127*allDeleta) # Clamp the perturbed weights into correct range.    
+    cleanParam_q = torch.round((allParamClean/ allDeleta)) # Quantized the weights from the clean model by using symmetric-signed.
+    cleanParam_q = cleanParam_q.to(torch.int8)
+    changeParam_q = torch.round((changeParamTmp / allDeleta)) # Quantized the weights of the perturbed model by using symmetric-signed.
+    changeParam_q = changeParam_q.to(torch.int8)
+
+    # for idx in topK:
+    # Change the perturbed weights into byte. Reference: https://stackoverflow.com/questions/72851439/fast-computation-for-changing-the-leftmost-different-bit
+    bit_tmp = applyBitAttack(cleanParam_q.to(torch.uint8), changeParam_q.to(torch.uint8))
+    bit_tmp = bit_tmp.to(torch.int8) 
+    allParamPerturb = bit_tmp * allDeleta # Dequantized the perturbed weights and set the results to perturbed models.
+    
+    # print('-----------------------------------------')
+    # print("Origin bit_clean: {}".format(bin(cleanParam_q[topK[0]].to(torch.uint8))))
+    # print("Origin bit_tmp: {}".format(bin(changeParam_q[topK[0]].to(torch.uint8))))
+    # print("Afrer change bit_tmp: {}".format(bin(bit_tmp[topK[0]].to(torch.uint8))))
+    # print('')
+    # print("Origin bit_clean: {}".format(bin(cleanParam_q[topK[200]].to(torch.uint8))))
+    # print("Origin bit_tmp: {}".format(bin(changeParam_q[topK[200]].to(torch.uint8))))
+    # print("Afrer change bit_tmp: {}".format(bin(bit_tmp[topK[200]].to(torch.uint8))))
+    # print('')
+    # print("Origin bit_clean: {}".format(bin(cleanParam_q[5].to(torch.uint8))))
+    # print("Origin bit_tmp: {}".format(bin(changeParam_q[5].to(torch.uint8))))
+    # print("Afrer change bit_tmp: {}".format(bin(bit_tmp[5].to(torch.uint8))))
+    # print('')
+    # print(5 in topK)
+    # print("different: {}".format(allParamPerturb[idx] - bit_tmp * allDeleta[idx]))
+    # sumDiff += torch.sum(allParamPerturb[idx] - bit_tmp * allDeleta[idx]).abs()
         
-        cleanParam_q = torch.round((allParamClean[idx] / allDeleta[idx])) # Quantized the weights from the clean model by using symmetric-signed.
-        cleanParam_q = cleanParam_q.to(torch.int8)
-        changeParam_q = torch.round((changeParamTmp / allDeleta[idx])) # Quantized the weights of the perturbed model by using symmetric-signed.
-        changeParam_q = changeParam_q.to(torch.int8)
-        
-        # Change the perturbed weights into byte. Reference: https://stackoverflow.com/questions/55918468/convert-integer-to-pytorch-tensor-of-binary-bits
-        # Because only one bit can be changed in the perturbed weights. Therefore, the bit presentation from perturbed weights should be compared with the bit presentation from clean weights.
-        mask = 2**torch.arange(precision-1, -1, -1).to(device) # Define the mask.
-        bit_clean = cleanParam_q.unsqueeze(-1).bitwise_and(mask).ne(0).byte() # bitwise presentation from clean weights.
-        bit_tmp = changeParam_q.unsqueeze(-1).bitwise_and(mask).ne(0).byte() # bitwise presentation from perturbed weights.
-        # print("Origin bit_clean: {}".format(bit_clean))
-        # print("Origin bit_tmp: {}".format(bit_tmp))
-        flag = True
-        for i in range(8):
-            if flag and bit_clean[i] != bit_tmp[i]: # Change only the left-most different bit for final attack.
-                flag = False
-            else:
-                bit_tmp[i] = bit_clean[i] # Otherwise,  remain the same.
-        # print("Afrer change bit_tmp: {}".format(bit_tmp))
-        bit_tmp = bit_tmp.to(torch.int8) 
-        bit_tmp = torch.sum(mask * bit_tmp, -1) # Change back to int.
-        # print("different: {}".format(allParamPerturb[idx] - bit_tmp * allDeleta[idx]))
-        # sumDiff += torch.sum(allParamPerturb[idx] - bit_tmp * allDeleta[idx]).abs()
-        allParamPerturb[idx] = bit_tmp * allDeleta[idx] # Dequantized the perturbed weights and set the results to perturbed models.
     
     # print("Inner diff: {}".format(sumDiff))
         
@@ -315,7 +226,7 @@ def pgd(model_origin, model_p, alpha, precision, device):
                 allDeleta = torch.concat((allDeleta, delta.expand(ParamNum)))
 
     # Find top K gradients:
-    topKVal, topKIdx = torch.topk(allGrads.abs(), 3)
+    topKVal, topKIdx = torch.topk(allGrads.abs(), 10000)
     # Apply attack on weights
     allParam = bitErrorAttack(allParamClean, allParam, allGrads, allDeleta, topKIdx, alpha, precision, device)
 
@@ -394,7 +305,19 @@ def transform_train(
     torch.backends.cudnn.benchmark = True
 
 
-    Gen = Generator(cfg)
+    if cfg.G == 'ConvL':
+        Gen = GeneratorConvLQ(precision)
+    elif cfg.G == 'ConvS':
+        Gen = GeneratorConvSQ(precision)
+    elif cfg.G == 'DeConvL':
+        Gen = GeneratorDeConvLQ(precision)
+    elif cfg.G == 'DeConvS':
+        Gen = GeneratorDeConvSQ(precision)
+    elif cfg.G == 'UNetL':
+        Gen = GeneratorUNetLQ(precision)
+    elif cfg.G == 'UNetS':
+        Gen = GeneratorUNetSQ(precision)
+        
     Gen = Gen.to(device)
     Gen.train()
 
@@ -423,13 +346,13 @@ def transform_train(
     for name, param in Gen.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
-    print('========== Check setting: Epoch: {}, Batch_size: {}, Lambda: {}, BitErrorRate: {} =========='.format(cfg.epochs, cfg.batch_size, lb, ber))
+    print('========== Check setting: Epoch: {}, Batch_size: {}, Lambda: {}, BitErrorRate: {}, G: {} =========='.format(cfg.epochs, cfg.batch_size, lb, ber, cfg.G))
     print('========== Check PGD setting: STEP: {}, LR_p: {}, LR_a: {} =========='.format(cfg.PGD_STEP, cfg.learning_rate, cfg.alpha))
     print('========== Check folder: save_dir: {}, save_dir_curve: {} =========='.format(cfg.save_dir, cfg.save_dir_curve))
     print('========== Layerwise Training: {}, Random Training: {}'.format(cfg.layerwise, cfg.totalRandom))
     print("========== Start training the parameter of the input transform by using Adversarial Training ==========")
 
-    (model, _, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0) # Create clean model.
+    (model, _, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0, dataset=dataset) # Create clean model.
     
     # EPSILON = ber * 511 #(256+128+64+32+16+8+4+2+1)
     # EPSILON = 0.01 * 128 #(256+128+64+32+16+8+4+2+1)
@@ -459,7 +382,7 @@ def transform_train(
                     param.requires_grad = False
                 Gen.zero_grad()
                 image, label = image.to(device), label.to(device)
-                image_adv, _ = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
+                image_adv = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
                 image_adv = image_adv.to(device)
                 out_perturb = model_perturbed(image_adv)
                 loss_pgd, pred_pgd = compute_loss(out_perturb, label)
@@ -485,7 +408,7 @@ def transform_train(
 
             loss = 0
             image, label = image.to(device), label.to(device)
-            image_adv, _ = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
+            image_adv = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
             image_adv = image_adv.to(device)
 
             # model_np = copy.deepcopy(model) # Inference origin images
@@ -553,12 +476,12 @@ def transform_train(
         if (epoch + 1) % 50 == 0 or (epoch + 1) == cfg.epochs:
             # Saving the result of the generator!
             torch.save(Gen.state_dict(),
-                cfg.save_dir + 'Adversarial_GeneratorV1_arch_{}_LR_a{}_p{}_E_{}_PGD_{}_ber_{}_lb_{}_NOWE_{}_same_255.pt'.format(arch, cfg.alpha, cfg.learning_rate, cfg.epochs, cfg.PGD_STEP, ber, lb, epoch+1))
+                cfg.save_dir + 'Adversarial_GeneratorV1_{}_arch_{}_LR_a{}_p{}_E_{}_PGD_{}_ber_{}_lb_{}_NOWE_{}_bit_10000.pt'.format(dataset, arch, cfg.alpha, cfg.learning_rate, cfg.epochs, cfg.PGD_STEP, ber, lb, epoch+1))
 
     # Draw learning curve:
     plt.plot([e+1 for e in range(cfg.epochs)], storeLoss)
     plt.title('Learning Curve')
-    plt.savefig(cfg.save_dir + 'Learning_Curve.jpg')
+    plt.savefig(cfg.save_dir + 'Adversarial_GeneratorV1_{}_arch_{}_LR_a{}_p{}_E_{}_PGD_{}_ber_{}_lb_{}_NOWE_{}_bit_10000_Learning_Curve.jpg'.format(dataset, arch, cfg.alpha, cfg.learning_rate, cfg.epochs, cfg.PGD_STEP, ber, lb, epoch+1))
 
 
     # -------------------------------------------------- Inference --------------------------------------------------
@@ -568,7 +491,7 @@ def transform_train(
 
     cfg.replaceWeight = False
 
-    (model, _, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0) # Create clean model.
+    (model, _, _, _) = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl,  ber, pos, seed=0, dataset=dataset) # Create clean model.
 
     model_perturbed = copy.deepcopy(model)
     model.eval()
@@ -582,7 +505,7 @@ def transform_train(
             param.requires_grad = True
         Gen.zero_grad()
         image, label = image.to(device), label.to(device)
-        image_adv, _ = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
+        image_adv = Gen(image)  # pylint: disable=E1102, Prevent "Trying to backward through the graph a second time" error!
         out_perturb = model_perturbed(image_adv)
         loss_pgd, pred_pgd = compute_loss(out_perturb, label)
         loss_pgd.backward()
@@ -609,7 +532,7 @@ def transform_train(
     accuracy_orig_test_list_with_transformation = []
     accuracy_p_test_list_with_transformation = []
 
-    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos)
+    model, _, model_perturbed, _ = init_models_pairs(arch, in_channels, precision, True, checkpoint_path, fl, ber, pos, dataset=dataset)
     model, model_perturbed = model.to(device), model_perturbed.to(device)
     for i in range(cfg.beginSeed, cfg.endSeed):
         print(' ********** For seed: {} ********** '.format(i))

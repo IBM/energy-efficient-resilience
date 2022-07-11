@@ -15,10 +15,11 @@
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
+import torch.nn.functional as F
 
 from config import cfg
 from models import init_models_pairs, create_faults
-from models.focal import FocalLoss
+from models.generator import *
 import faultsMap as fmap
 
 from collections import OrderedDict
@@ -30,71 +31,6 @@ import copy
 
 torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-class Generator(nn.Module):
-    """
-    Apply reprogramming.
-    """
-
-    def __init__(self, cfg):
-        super(Generator, self).__init__()
-        self.cfg = cfg
-        self.num_classes = 10
-
-        # Encoder
-        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv1_1.weight)
-        self.bn1_1 = nn.BatchNorm2d(32)
-        self.relu1_1 = nn.ReLU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
-        
-        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv2_1.weight)
-        self.bn2_1 = nn.BatchNorm2d(64)
-        self.relu2_1 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
-
-        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv3_1.weight)
-        self.bn3_1 = nn.BatchNorm2d(64)
-        self.relu3_1 = nn.ReLU()
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
-
-        self.dconv4_1 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv4_1.weight)
-        self.bn4_1 = nn.BatchNorm2d(64)
-        self.relu4_1 = nn.ReLU()
-
-        self.dconv5_1 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv5_1.weight)
-        self.bn5_1 = nn.BatchNorm2d(32)
-        self.relu5_1 = nn.ReLU()
-
-        self.dconv6_1 = nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv6_1.weight)
-        self.bn6_1 = nn.BatchNorm2d(3)
-        self.tanh = torch.nn.Tanh()
-
-    def forward(self, image):
-        img = image.data.clone()
-        # Encoder
-        x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
-        x = self.maxpool1(x)
-        x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
-        x = self.maxpool2(x)
-        x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
-        x = self.maxpool3(x)
-
-        # Decoder
-        x = self.relu4_1(self.bn4_1(self.dconv4_1(x)))
-        x = self.relu5_1(self.bn5_1(self.dconv5_1(x)))
-        x = self.bn6_1(self.dconv6_1(x))
-        out = self.tanh(x)
-
-        x_adv = torch.clamp(image + out, min=-1, max=1)
-
-        return x_adv
 
 def compute_loss(model_outputs, labels):
     _, preds = torch.max(model_outputs, 1)
@@ -243,7 +179,19 @@ def transform_train(
 
     storeLoss = []
 
-    Gen = Generator(cfg)
+    if cfg.G == 'ConvL':
+        Gen = GeneratorConvLQ(precision)
+    elif cfg.G == 'ConvS':
+        Gen = GeneratorConvSQ(precision)
+    elif cfg.G == 'DeConvL':
+        Gen = GeneratorDeConvLQ(precision)
+    elif cfg.G == 'DeConvS':
+        Gen = GeneratorDeConvSQ(precision)
+    elif cfg.G == 'UNetL':
+        Gen = GeneratorUNetLQ(precision)
+    elif cfg.G == 'UNetS':
+        Gen = GeneratorUNetSQ(precision)
+        
     Gen = Gen.to(device)
 
     # Using Adam:
@@ -263,7 +211,7 @@ def transform_train(
     #)
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=1000, gamma=cfg.decay
+        optimizer, step_size=500, gamma=cfg.decay
     )
     lb = cfg.lb  # Lambda 
 
@@ -273,7 +221,7 @@ def transform_train(
     for name, param in Gen.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
-    print('========== Check setting: Epoch: {}, Batch_size: {}, N perturbed models: {}, Lambda: {}, BitErrorRate: {}, LR: {}=========='.format(cfg.epochs, cfg.batch_size, cfg.N, lb, ber, cfg.learning_rate))
+    print('========== Check setting: Epoch: {}, Batch_size: {}, N perturbed models: {}, Lambda: {}, BitErrorRate: {}, LR: {}, G: {}=========='.format(cfg.epochs, cfg.batch_size, cfg.N, lb, ber, cfg.learning_rate, cfg.G))
     print('========== Layerwise Training: {}, Random Training: {}'.format(cfg.layerwise, cfg.totalRandom))
 
     print(
@@ -394,8 +342,8 @@ def transform_train(
             optimizer.step()
             lr_scheduler.step()
             
-        print('Each pred w/o transformation: {}'.format([x/len(trainloader.dataset) for x in each_c_pred]))
-        print('Each pred with transformation: {}'.format([x/len(trainloader.dataset) for x in each_p_pred]))
+        print('Each pred w/o transformation: {}'.format([np.round(x/len(trainloader.dataset), decimals=4) for x in each_c_pred]))
+        print('Each pred with transformation: {}'.format([np.round(x/len(trainloader.dataset), decimals=4) for x in each_p_pred]))
             
         # Keep the running accuracy of clean model and perturbed model for all mini-batch.
         accuracy_orig = running_correct_orig / (len(trainloader.dataset) * cfg.N)
@@ -417,12 +365,12 @@ def transform_train(
         if (epoch + 1) % 20 == 0 or (epoch + 1) == cfg.epochs:
             # Saving the result of the generator!
             torch.save(Gen.state_dict(),
-                cfg.save_dir + 'EOPM_GeneratorV9_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step1000_NOWE_{}.pt'.format(dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N, epoch+1))
+                cfg.save_dir + 'EOPM_Generator{}Q_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step500_NOWE_{}.pt'.format(cfg.G, dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N, epoch+1))
             
             # Draw learning curve:
             plt.plot([e+1 for e in range(epoch + 1)], storeLoss)
             plt.title('Learning Curve')
-            plt.savefig(cfg.save_dir + 'EOPM_GeneratorV9_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step1000_LearningCurve.jpg'.format(dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N))
+            plt.savefig(cfg.save_dir + 'EOPM_Generator{}Q_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step500_LearningCurve.jpg'.format(cfg.G, dataset, arch, cfg.learning_rate, cfg.epochs, ber, lb, cfg.N))
 
     print('========== Start checking the accuracy with different perturbed model ==========')
     # Setting without input transformation

@@ -19,6 +19,7 @@ from collections import OrderedDict
 
 from config import cfg
 from models import init_models_pairs, create_faults, init_models
+from models.generator import *
 import faultsMap as fmap
 import itertools
 import numpy as np
@@ -59,168 +60,6 @@ class Program(nn.Module):
         # x_adv = torch.tanh(0.5 * (torch.log(1 + x + 1e-15) - torch.log(1 - x + 1e-15)) + self.P)
         x_adv = x + torch.clamp(self.P, min=-1, max=1)
         x_adv = torch.clamp(x_adv, min=-1, max=1)
-
-        return x_adv
-
-'''
-class Generator(nn.Module):
-    """
-    Apply reprogramming.
-    """
-
-    def __init__(self, cfg):
-        super(Generator, self).__init__()
-        self.cfg = cfg
-        self.num_classes = 10
-
-        # Encoder
-        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv1_1.weight)
-        self.bn1_1 = nn.BatchNorm2d(32)
-        self.relu1_1 = nn.ReLU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
-        
-        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv2_1.weight)
-        self.bn2_1 = nn.BatchNorm2d(64)
-        self.relu2_1 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
-
-        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        # torch.nn.init.xavier_uniform(self.conv3_1.weight)
-        self.bn3_1 = nn.BatchNorm2d(64)
-        self.relu3_1 = nn.ReLU()
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
-
-        self.dconv4_1 = nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv4_1.weight)
-        self.bn4_1 = nn.BatchNorm2d(64)
-        self.relu4_1 = nn.ReLU()
-
-        self.dconv5_1 = nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv5_1.weight)
-        self.bn5_1 = nn.BatchNorm2d(32)
-        self.relu5_1 = nn.ReLU()
-
-        self.dconv6_1 = nn.ConvTranspose2d(in_channels=32, out_channels=3, kernel_size=4, stride=2, padding=1)
-        # torch.nn.init.xavier_uniform(self.dconv6_1.weight)
-        self.bn6_1 = nn.BatchNorm2d(3)
-        self.tanh = torch.nn.Tanh()
-
-    def forward(self, image):
-        img = image.data.clone()
-        # Encoder
-        x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
-        x = self.maxpool1(x)
-        x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
-        x = self.maxpool2(x)
-        x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
-        x = self.maxpool3(x)
-
-        # Decoder
-        x = self.relu4_1(self.bn4_1(self.dconv4_1(x)))
-        x = self.relu5_1(self.bn5_1(self.dconv5_1(x)))
-        x = self.bn6_1(self.dconv6_1(x))
-        out = self.tanh(x)
-
-        x_adv = torch.clamp(image + out, min=-1, max=1)
-
-        return x_adv
-'''
-
-class Generator(nn.Module):
-    """
-    Apply reprogramming.
-    """
-
-    def __init__(self, cfg):
-        super(Generator, self).__init__()
-        self.cfg = cfg
-        self.num_classes = 10
-
-        # Encoder
-        self.conv1_1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.bn1_1 = nn.BatchNorm2d(32)
-        self.relu1_1 = nn.ReLU()
-        self.conv1_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.bn1_2 = nn.BatchNorm2d(32)
-        self.relu1_2 = nn.ReLU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
-        
-        self.conv2_1 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.bn2_1 = nn.BatchNorm2d(64)
-        self.relu2_1 = nn.ReLU()
-        self.conv2_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.bn2_2 = nn.BatchNorm2d(64)
-        self.relu2_2 = nn.ReLU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
-
-        self.conv3_1 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.bn3_1 = nn.BatchNorm2d(128)
-        self.relu3_1 = nn.ReLU()
-        self.conv3_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn3_2 = nn.BatchNorm2d(128)
-        self.relu3_2 = nn.ReLU()
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
-
-        
-        self.conv4_1 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn4_1 = nn.BatchNorm2d(128)
-        self.relu4_1 = nn.ReLU()
-        self.upsample4_1 = nn.Upsample(scale_factor=2)
-        self.conv4_2 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=3, padding=1)
-        self.bn4_2 = nn.BatchNorm2d(128)
-        self.relu4_2 = nn.ReLU()
-
-        self.conv5_1 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1)
-        self.bn5_1 = nn.BatchNorm2d(64)
-        self.relu5_1 = nn.ReLU()
-        self.upsample5_1 = nn.Upsample(scale_factor=2)
-        self.conv5_2 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, padding=1)
-        self.bn5_2 = nn.BatchNorm2d(64)
-        self.relu5_2 = nn.ReLU()
-
-        self.conv6_1 = nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1)
-        self.relu6_1 = nn.ReLU()
-        self.bn6_1 = nn.BatchNorm2d(32)
-        self.upsample6_1 = nn.Upsample(scale_factor=2)
-        self.conv6_2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.bn6_2 = nn.BatchNorm2d(32)
-        self.relu6_2 = nn.ReLU()
-
-        self.convout = nn.Conv2d(in_channels=32, out_channels=3, kernel_size=3, padding=1)
-        self.bnout = nn.BatchNorm2d(3)
-        self.tanh = torch.nn.Tanh()
-
-
-
-    def forward(self, image):
-        img = image.data.clone()
-        # Encoder
-        x = self.relu1_1(self.bn1_1(self.conv1_1(img)))
-        x = self.relu1_2(self.bn1_2(self.conv1_2(x)))
-        x = self.maxpool1(x)
-        x = self.relu2_1(self.bn2_1(self.conv2_1(x)))
-        x = self.relu2_2(self.bn2_2(self.conv2_2(x)))
-        x = self.maxpool2(x)
-        x = self.relu3_1(self.bn3_1(self.conv3_1(x)))
-        x = self.relu3_2(self.bn3_2(self.conv3_2(x)))
-        x = self.maxpool3(x)
-
-        # Decoder
-        x = self.relu4_1(self.bn4_1(self.conv4_1(x)))
-        x = self.upsample4_1(x)
-        x = self.relu4_2(self.bn4_2(self.conv4_2(x)))
-        x = self.relu5_1(self.bn5_1(self.conv5_1(x)))
-        x = self.upsample5_1(x)
-        x = self.relu5_2(self.bn5_2(self.conv5_2(x)))
-        x = self.relu6_1(self.bn6_1(self.conv6_1(x)))
-        x = self.upsample6_1(x)
-        x = self.relu6_2(self.bn6_2(self.conv6_2(x)))
-        x = self.bnout(self.convout(x))
-        out = self.tanh(x)
-
-        x_adv = torch.clamp(img + out, min=-1, max=1)
 
         return x_adv
 
@@ -403,12 +242,6 @@ def transform_eval(
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
-    Pg = Program(cfg)
-    Pg.P = torch.load(cfg.P_PATH)['Reprogrammed Perturbation']
-    Pg.to(device)
-    Pg.eval()
-    print('Successfully load input transformation parameter!')
-
     if(cfg.testing_mode == 'clean'):
         model, checkpoint_epoch = init_models(arch, 3, precision, True, checkpoint_path, dataset)
 
@@ -418,6 +251,11 @@ def transform_eval(
 
 
     if(cfg.testing_mode == 'random_bit_error'):
+        Pg = Program(cfg)
+        Pg.P = torch.load(cfg.P_PATH)['Reprogrammed Perturbation']
+        Pg.to(device)
+        Pg.eval()
+        print('Successfully load input transformation parameter!')
         print('========== Start checking the accuracy with different perturbed model: bit error mode ==========')
         # Setting without input transformation
         accuracy_orig_train_list = []
@@ -603,7 +441,14 @@ def transform_eval(
 
 
     if(cfg.testing_mode == 'generator_base'):
-        Gen = Generator(cfg)
+        
+        if cfg.G == 'large':
+            Gen = Generatorv1Q(cfg, precision)
+        elif cfg.G == 'small':
+            Gen = Generatorv9Q(cfg, precision)
+        elif cfg.G == 'UNet':
+            Gen = GeneratorUNetQ(precision)
+        
         Gen.load_state_dict(torch.load(cfg.G_PATH))
         # Gen = torch.load(cfg.G_PATH)
         Gen = Gen.to(device)

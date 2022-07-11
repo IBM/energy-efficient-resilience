@@ -46,16 +46,22 @@ def create_faults(
     )
 
 
-def init_models(arch, in_channels, precision, retrain, checkpoint_path, dataset='cifar'):
+def init_models(arch, in_channels, precision, retrain, checkpoint_path, dataset='cifar10'):
 
     """
     Default model loader
     """
     classes = 10
-    if dataset == 'cifar':
+    if dataset == 'cifar10':
         classes = 10
+    elif dataset == 'cifar100':
+        classes = 100
     elif dataset == 'tinyimagenet':
         classes = 200
+    elif dataset == 'gtsrb':
+        classes = 43
+    else:
+        classes = 10
 
 
     if arch == "vgg11":
@@ -126,14 +132,18 @@ def init_models_faulty(
         """Perturbed models, where the weights are injected with bit
         errors at the rate of ber at the specified positions"""
         
-        classes = 0
-        if dataset == 'cifar':
+        classes = 10
+        if dataset == 'cifar10':
             classes = 10
+        elif dataset == 'cifar100':
+            classes = 100
         elif dataset == 'tinyimagenet':
             classes = 200
+        elif dataset == 'gtsrb':
+            classes = 43
         else:
             classes = 10
-        
+
         if arch == "vgg11":
             model = vggf(
                 "A",

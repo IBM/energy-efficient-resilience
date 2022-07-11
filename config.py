@@ -79,6 +79,7 @@ cfg.N = 100
 cfg.randomRange = 30000
 cfg.totalRandom = True # True: Sample perturbed models in the range cfg.randomRange
 cfg.layerwise = False # True: Layerwise training / False: Normal training
+cfg.G = 'large'
 
 # For transform adversarial
 cfg.alpha = 1
@@ -89,7 +90,8 @@ cfg.beginSeed = 50000
 cfg.endSeed = 50010
 
 # For transform_eval
-cfg.testing_mode = 'generator_base' # clean / random_bit_error / adversarial / activation / generator_base
+cfg.testing_mode = 'clean' # clean / random_bit_error / adversarial / activation / generator_base
 cfg.P_PATH = '/home/haolun/energy-efficient-resilience_dev/activation_p/Activation_test_arch_resnet18_LR_p0.00075_E_5_ber_0.01_lb_0.01_X+P_NowE5.pt'
-cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev_forRandomImprove/generatorBackup/EOPM_GeneratorV1_arch_resnet18_LR0.001_E_300_ber_0.01_lb_5.0_N_10_step1000_NOWE_300.pt'
+# cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev_forRandomImprove/generatorBackup/EOPM_GeneratorV1_arch_resnet18_LR0.001_E_300_ber_0.01_lb_5.0_N_10_step1000_NOWE_300.pt'
+cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev_forRandomImprove/adversarial_gen_bit/Adversarial_GeneratorV1_cifar10_arch_resnet18_LR_a1_p0.01_E_300_PGD_1_ber_0.01_lb_1.0_NOWE_300_bit_1000.pt'
 

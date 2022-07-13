@@ -1,0 +1,5 @@
+torch
+matplotlib
+easydict
+torchvision
+torchsummary

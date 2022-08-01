@@ -18,15 +18,38 @@ cfg = EasyDict()
 
 cfg.machine = 'lab' # TWCC / lab
 
-# cfg.faulty_layers = []
+cfg.faulty_layers = []
 # cfg.faulty_layers = ['l3']
-cfg.faulty_layers = ['conv', 'l1', 'l2', 'l3', 'l4', 'linear']  # For ResNet18
+#cfg.faulty_layers = ['conv', 'l1', 'l2', 'l3', 'l4', 'linear']  # For ResNet18
 # cfg.faulty_layers = ["linear", "conv"]
 
 cfg.batch_size = 512
 cfg.test_batch_size = 100
 cfg.epochs = 2
 cfg.precision = 8
+
+# cifar10 training parameters
+cfg.learning_rate = 1e-2
+cfg.lr_decay = 0.1
+cfg.lr_step = [100]
+cfg.weight_decay = 5e-4
+
+#cifar100 training parameters
+#cfg.learning_rate = 1e-2
+#cfg.lr_decay = 0.2
+#cfg.lr_step = [60, 120, 160]
+#cfg.weight_decay = 5e-4
+
+# Nandhini - sparsity experiments 
+#cfg.learning_rate = 1e-3
+#cfg.lr_decay = 1.0
+#cfg.weight_decay = 5e-4
+#cfg.w1 = 32  # 28 #224
+#cfg.h1 = 32  # 28 #224
+#cfg.w2 = 32  # 32 28 #224
+#cfg.h2 = 32  # 32 28 #224
+
+
 
 # For setting the machine
 if cfg.machine == 'TWCC':
@@ -57,21 +80,20 @@ else:
     )
     
 
-cfg.temperature = 1
-cfg.channels = 3
+#cfg.data_dir = (
+#    "~/datasets"
+#)
+#cfg.model_dir = (
+#    "./model_weights/symmetric_signed/"
+#)
+#cfg.save_dir = (
+#    "./eerai_saved"
+#)
+#cfg.save_dir_curve = (
+#    "./eerai_saved"
+#)
 
-cfg.w1 = 32  # 28 #224
-cfg.h1 = 32  # 28 #224
-cfg.w2 = 32  # 32 28 #224
-cfg.h2 = 32  # 32 28 #224
-cfg.lmd = 5e-7
-cfg.learning_rate = 1
-cfg.flow_lr = 2e-3
-cfg.decay = 0.96
-cfg.max_epoch = 1
-cfg.lb = 1
-cfg.device = None
-cfg.seed = 0
+
 
 
 # For EOPM

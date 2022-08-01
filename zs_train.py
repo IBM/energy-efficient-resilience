@@ -83,16 +83,20 @@ def training(
         opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9)
         #iter_per_epoch = len(trainloader)
         #warmup_scheduler = WarmUpLR(opt, iter_per_epoch * 1) # warmup = 1
-        train_scheduler = optim.lr_scheduler.MultiStepLR(opt, milestones=[60, 120, 160], gamma=0.2)
+        train_scheduler = optim.lr_scheduler.MultiStepLR(opt, milestones=cfg.lr_step, gamma=cfg.lr_decay)
+
     else:
-        opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9)
+        opt = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=0.9, weight_decay=cfg.weight_decay)
+        lr_scheduler = optim.lr_scheduler.MultiStepLR(
+        opt, milestones=cfg.lr_step, gamma=cfg.lr_decay
+    )
 
     model = model.to(device)
-    from torchsummary import summary
-    if dataset == 'tinyimagenet':
-        summary(model, (3, 64, 64))
-    else:
-        summary(model, (3, 32, 32))
+    #from torchsummary import summary
+    #if dataset == 'tinyimagenet':
+    #    summary(model, (3, 64, 64))
+    #else:
+    #    summary(model, (3, 32, 32))
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
 
@@ -109,20 +113,6 @@ def training(
 
             opt.zero_grad()
 
-            # Store original model parameters before
-            # quantization/perturbation, detached from graph
-            if precision > 0:
-                list_init_params = []
-                with torch.no_grad():
-                    for init_params in model.parameters():
-                        list_init_params.append(init_params.clone().detach())
-
-                if debug:
-                    if batch_id % 100 == 0:
-                        print("initial params")
-                        print(model.fc2.weight[0:3, 0:3])
-                        print(model.conv1.weight[0, 0, :, :])
-
             model.train()
             model_outputs = model(inputs)  # pylint: disable=E1102
 
@@ -131,29 +121,10 @@ def training(
                 outputs.size(0)
             )  # changing the size from (batch_size,1) to batch_size.
 
-            if precision > 0:
-                if debug:
-                    if batch_id % 100 == 0:
-                        print("quantized params")
-                        print(model.fc2.weight[0:3, 0:3])
-                        print(model.conv1.weight[0, 0, :, :])
-
             loss = nn.CrossEntropyLoss()(model_outputs, outputs)
 
             # Compute gradient of perturbed weights with perturbed loss
             loss.backward()
-
-            # restore model weights with unquantized value
-            if precision > 0:
-                with torch.no_grad():
-                    for i, restored_params in enumerate(model.parameters()):
-                        restored_params.copy_(list_init_params[i])
-
-                if debug:
-                    if batch_id % 100 == 0:
-                        print("restored params")
-                        print(model.fc2.weight[0:3, 0:3])
-                        print(model.conv1.weight[0, 0, :, :])
 
             # update restored weights with gradient
             opt.step()
@@ -167,6 +138,9 @@ def training(
 
             running_loss += loss.item()
             running_correct += torch.sum(preds == outputs.data)
+
+        if dataset == 'cifar10':
+            lr_scheduler.step()
 
         accuracy = running_correct.double() / (len(trainloader.dataset))
         print(

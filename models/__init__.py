@@ -13,6 +13,14 @@
 # limitations under the License.
 
 import os
+from models.generator import (
+    GeneratorConvLQ,
+    GeneratorConvSQ,
+    GeneratorDeConvLQ,
+    GeneratorDeConvSQ,
+    GeneratorUNetLQ,
+    GeneratorUNetSQ,
+)
 
 import torch
 
@@ -99,7 +107,10 @@ def init_models(
         # print("Restoring model from checkpoint", checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
 
-        model.load_state_dict(checkpoint["model_state_dict"])
+        try:
+            model.load_state_dict(checkpoint["model_state_dict"])
+        except KeyError:
+            model.load_state_dict(checkpoint)
         # print("restored checkpoint at epoch - ", checkpoint["epoch"])
         # print("Training loss =", checkpoint["loss"])
         # print("Training accuracy =", checkpoint["accuracy"])
@@ -145,84 +156,87 @@ def init_models_faulty(
         else:
             classes = 10
 
-        if arch == "vgg11":
-            model = vggf(
-                "A",
-                in_channels,
-                classes,
-                True,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "vgg16":
-            model = vggf(
-                "D",
-                in_channels,
-                classes,
-                True,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "vgg19":
-            model = vggf(
-                "E",
-                in_channels,
-                classes,
-                True,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "resnet18":
-            model = resnetf(
-                "resnet18",
-                classes,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "resnet34":
-            model = resnetf(
-                "resnet34",
-                classes,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "resnet50":
-            model = resnetf(
-                "resnet50",
-                classes,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "resnet101":
-            model = resnetf(
-                "resnet101",
-                classes,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        else:
-            model = lenetf(
-                in_channels,
-                classes,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
+        ## FIX ME - THIS IS TEMPORARY ##
+        model = GeneratorConvLQ(precision)
+
+        # if arch == "vgg11":
+        #     model = vggf(
+        #         "A",
+        #         in_channels,
+        #         classes,
+        #         True,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # elif arch == "vgg16":
+        #     model = vggf(
+        #         "D",
+        #         in_channels,
+        #         classes,
+        #         True,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # elif arch == "vgg19":
+        #     model = vggf(
+        #         "E",
+        #         in_channels,
+        #         classes,
+        #         True,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # elif arch == "resnet18":
+        #     model = resnetf(
+        #         "resnet18",
+        #         classes,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # elif arch == "resnet34":
+        #     model = resnetf(
+        #         "resnet34",
+        #         classes,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # elif arch == "resnet50":
+        #     model = resnetf(
+        #         "resnet50",
+        #         classes,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # elif arch == "resnet101":
+        #     model = resnetf(
+        #         "resnet101",
+        #         classes,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
+        # else:
+        #     model = lenetf(
+        #         in_channels,
+        #         classes,
+        #         precision,
+        #         bit_error_rate,
+        #         position,
+        #         faulty_layers,
+        #     )
 
     # print(model)
     checkpoint_epoch = -1
@@ -241,11 +255,15 @@ def init_models_faulty(
         # print("Restoring model from checkpoint", checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
 
-        model.load_state_dict(checkpoint["model_state_dict"])
+        try:
+            model.load_state_dict(checkpoint["model_state_dict"])
+        except KeyError:
+            model.load_state_dict(checkpoint)
         # print("restored checkpoint at epoch - ", checkpoint["epoch"])
         # print("Training loss =", checkpoint["loss"])
         # print("Training accuracy =", checkpoint["accuracy"])
-        checkpoint_epoch = checkpoint["epoch"]
+        # checkpoint_epoch = checkpoint["epoch"]
+        checkpoint_epoch = 240
 
     return model, checkpoint_epoch
 

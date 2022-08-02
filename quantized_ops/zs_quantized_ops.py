@@ -161,6 +161,8 @@ class nnLinearSymQuant(nn.Linear):
         if self.precision > 0:
             quantWeight = SymmetricQuantizeDequantize.apply
             weight = quantWeight(self.weight, self.precision, self.clamp_val)
+        else:
+            weight = self.weight
         return F.linear(input, weight, self.bias)
 
     def extra_repr(self) -> str:
@@ -222,6 +224,8 @@ class nnConv2dSymQuant(nn.Conv2d):
             quant_weight = quantWeight(
                 self.weight, self.precision, self.clamp_val
             )
+        else:
+            quant_weight = self.weight
 
         return F.conv2d(
             input,

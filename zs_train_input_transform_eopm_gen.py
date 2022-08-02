@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
@@ -447,11 +448,14 @@ def transform_train(
         storeLoss.append(running_loss / cfg.N)
 
         if (epoch + 1) % 20 == 0 or (epoch + 1) == cfg.epochs:
+            if not os.path.exists(cfg.save_dir):
+                os.makedirs(cfg.save_dir)
+
             # Saving the result of the generator!
             torch.save(
                 Gen.state_dict(),
                 cfg.save_dir
-                + "EOPM_Generator{}Q_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step500_NOWE_{}.pt".format(
+                + "EOPM_Generator{}Q_{}_arch_{}_LR{}_E_{}_ber_{}_lb_{}_N_{}_step500_NOWE_{}.pth".format(
                     cfg.G,
                     dataset,
                     arch,

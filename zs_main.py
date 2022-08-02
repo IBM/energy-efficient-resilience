@@ -22,7 +22,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-# Sinlge model
+# Single model
 import zs_test as test
 import zs_train as train
 import zs_train_input_transform_single as transform_single
@@ -45,6 +45,9 @@ import zs_train_input_transform_adversarial_w as transform_adversarial_w
 import zs_train_input_transform_eval as transform_eval
 from config import cfg
 from models import default_base_model_path
+
+# Auto-Attack module
+import zs_attack as attack
 
 np.set_printoptions(threshold=sys.maxsize)
 torch.manual_seed(0)
@@ -92,6 +95,7 @@ def main():
             "transform_adversarial_w",
             "transform_adversarial_gen",
             "transform_adversarial_gen_bit",
+            "auto_attack",
         ],
     )
     parser.add_argument(
@@ -166,7 +170,7 @@ def main():
         "--learning_rate",
         type=float,
         help="Learning rate for training input transformation of training clean model.",
-        default=5,
+        default=1e-3,
     )
     group.add_argument(
         "-LM",
@@ -209,6 +213,19 @@ def main():
         type=int,
         help="How many pgd steps for training.",
         default=2,
+    )
+    group.add_argument(
+        "--norm",
+        type=str,
+        help="Norm to use in Auto-Attack.",
+        choices=["L1", "L2", "Linf"],
+        default="L2",
+    )
+    group.add_argument(
+        "--epsilon",
+        type=float,
+        help="Epsilon to use in Auto-Attack.",
+        default=0.5,
     )
 
     args = parser.parse_args()
@@ -770,6 +787,22 @@ def main():
             cfg.faulty_layers,
             args.bit_error_rate,
             args.position,
+        )
+    elif args.mode == "auto_attack":
+        print("auto-attack module", args)
+        attack.attacking(
+            testloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.checkpoint,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+            args.norm,
+            args.epsilon,
         )
     else:
         raise NotImplementedError

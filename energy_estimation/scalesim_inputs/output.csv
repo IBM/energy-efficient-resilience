@@ -1,0 +1,16 @@
+Layer name,IFMAP Height,IFMAP Width,Filter Height,Filter Width,Channels,Num Filter,Strides
+inc.double_conv.0,32,32,3,3,3,8,1
+inc.double_conv.3,32,32,3,3,8,8,1
+down1.maxpool_conv.1.double_conv.0,16,16,3,3,8,16,1
+down1.maxpool_conv.1.double_conv.3,16,16,3,3,16,16,1
+down2.maxpool_conv.1.double_conv.0,8,8,3,3,16,32,1
+down2.maxpool_conv.1.double_conv.3,8,8,3,3,32,32,1
+down3.maxpool_conv.1.double_conv.0,4,4,3,3,32,64,1
+down3.maxpool_conv.1.double_conv.3,4,4,3,3,64,64,1
+up1.conv.double_conv.0,8,8,3,3,64,32,1
+up1.conv.double_conv.3,8,8,3,3,32,32,1
+up2.conv.double_conv.0,16,16,3,3,32,16,1
+up2.conv.double_conv.3,16,16,3,3,16,16,1
+up3.conv.double_conv.0,32,32,3,3,16,8,1
+up3.conv.double_conv.3,32,32,3,3,8,8,1
+outc.conv,32,32,1,1,8,3,1

@@ -170,7 +170,7 @@ def main():
         "--learning_rate",
         type=float,
         help="Learning rate for training input transformation of training clean model.",
-        default=1e-3,
+        default=1e-2,
     )
     group.add_argument(
         "-LM",
@@ -544,8 +544,8 @@ def main():
         )
     elif args.mode == "transform_single":
         print("input_transform_train_single", args)
-        cfg.save_dir = "single_p/"
-        cfg.save_dir_curve = "single_curve/"
+        cfg.save_dir += "single_p/"
+        cfg.save_dir_curve += "single_curve/"
         transform_single.transform_train(
             trainloader,
             testloader,
@@ -562,8 +562,8 @@ def main():
         )
     elif args.mode == "transform_single_gen":
         print("input_transform_train_single_gen", args)
-        cfg.save_dir = "single_p_gen/"
-        cfg.save_dir_curve = "single_curve_gen/"
+        cfg.save_dir += "single_p_gen/"
+        cfg.save_dir_curve += "single_curve_gen/"
         transform_single_gen.transform_train(
             trainloader,
             testloader,
@@ -580,8 +580,8 @@ def main():
         )
     elif args.mode == "transform_single_attention":
         print("input_transform_train_single_attention", args)
-        cfg.save_dir = "single_p_attention/"
-        cfg.save_dir_curve = "single_curve_attention/"
+        cfg.save_dir += "single_p_attention/"
+        cfg.save_dir_curve += "single_curve_attention/"
         transform_single_attention.transform_train(
             trainloader,
             testloader,
@@ -598,8 +598,8 @@ def main():
         )
     elif args.mode == "transform_activation":
         print("input_transform_train_activation", args)
-        cfg.save_dir = "activation_p/"
-        cfg.save_dir_curve = "activation_curve/"
+        cfg.save_dir += "activation_p/"
+        cfg.save_dir_curve += "activation_curve/"
         transform_activation.transform_train(
             trainloader,
             testloader,
@@ -616,8 +616,8 @@ def main():
         )
     elif args.mode == "transform_eopm":
         print("input_transform_train_eopm", args)
-        cfg.save_dir = "eopm_p/"
-        cfg.save_dir_curve = "eopm_curve/"
+        cfg.save_dir += "eopm_p/"
+        cfg.save_dir_curve += "eopm_curve/"
         transform_eopm.transform_train(
             trainloader,
             testloader,
@@ -634,8 +634,8 @@ def main():
         )
     elif args.mode == "transform_eopm_gen":
         print("input_transform_train_eopm_gen", args)
-        cfg.save_dir = "eopm_p_gen/"
-        cfg.save_dir_curve = "eopm_curve_gen/"
+        cfg.save_dir += "eopm_p_gen/"
+        cfg.save_dir_curve += "eopm_curve_gen/"
         transform_eopm_gen.transform_train(
             trainloader,
             testloader,
@@ -652,8 +652,8 @@ def main():
         )
     elif args.mode == "transform_mlp_eopm":
         print("input_transform_train_mlp_eopm", args)
-        cfg.save_dir = "mlp_eopm_p_w/"
-        cfg.save_dir_curve = "mlp_eopm_curve_w/"
+        cfg.save_dir += "mlp_eopm_p_w/"
+        cfg.save_dir_curve += "mlp_eopm_curve_w/"
         transform_mlp_eopm.transform_train(
             trainloader,
             testloader,
@@ -670,8 +670,8 @@ def main():
         )
     elif args.mode == "transform_adversarial":
         print("input_transform_train_adversarial", args)
-        cfg.save_dir = "adversarial_p/"
-        cfg.save_dir_curve = "adversarial_curve/"
+        cfg.save_dir += "adversarial_p/"
+        cfg.save_dir_curve += "adversarial_curve/"
         transform_adversarial.transform_train(
             trainloader,
             testloader,
@@ -688,8 +688,8 @@ def main():
         )
     elif args.mode == "transform_mlp_adversarial":
         print("input_transform_train_mlp_adversarial", args)
-        cfg.save_dir = "mlp_adversarial_p/"
-        cfg.save_dir_curve = "mlp_adversarial_curve/"
+        cfg.save_dir += "mlp_adversarial_p/"
+        cfg.save_dir_curve += "mlp_adversarial_curve/"
         transform_mlp_adversarial.transform_train(
             trainloader,
             testloader,
@@ -706,8 +706,8 @@ def main():
         )
     elif args.mode == "transform_adversarial_gen":
         print("input_transform_train_adversarial_gen", args)
-        cfg.save_dir = "adversarial_gen/"
-        cfg.save_dir_curve = "adversarial_gen/"
+        cfg.save_dir += "adversarial_gen/"
+        cfg.save_dir_curve += "adversarial_gen/"
         transform_adversarial_gen.transform_train(
             trainloader,
             testloader,
@@ -724,8 +724,8 @@ def main():
         )
     elif args.mode == "transform_adversarial_gen_bit":
         print("input_transform_train_adversarial_gen_bit", args)
-        cfg.save_dir = "adversarial_gen_bit/"
-        cfg.save_dir_curve = "adversarial_gen_bit/"
+        cfg.save_dir += "adversarial_gen_bit/"
+        cfg.save_dir_curve += "adversarial_gen_bit/"
         transform_adversarial_gen_bit.transform_train(
             trainloader,
             testloader,
@@ -742,8 +742,8 @@ def main():
         )
     elif args.mode == "transform_adversarial_w":
         print("input_transform_train_adversarial_w", args)
-        cfg.save_dir = "adversarial_p_w/"
-        cfg.save_dir_curve = "adversarial_curve_w/"
+        cfg.save_dir += "adversarial_p_w/"
+        cfg.save_dir_curve += "adversarial_curve_w/"
         transform_adversarial_w.transform_train(
             trainloader,
             testloader,

@@ -556,9 +556,6 @@ def transform_train(
 
         # same: use (epsilon*delta), different: only fix alpha
         if (epoch + 1) % 50 == 0 or (epoch + 1) == cfg.epochs:
-            if not os.path.exists(cfg.save_dir):
-                os.makedirs(cfg.save_dir)
-
             # Saving the result of the generator!
             torch.save(
                 Gen.state_dict(),

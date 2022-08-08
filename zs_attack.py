@@ -61,8 +61,8 @@ def attacking(
     # adversary.attacks_to_run = ['apgd-ce', 'fab']
     # adversary.apgd.n_restarts = 2
     # adversary.fab.n_restarts = 2
-    adversary.square.n_restarts = 15
-    adversary.square.n_queries = 15
+    adversary.square.n_restarts = 10
+    adversary.square.n_queries = 15000
 
     with torch.no_grad():
         print(

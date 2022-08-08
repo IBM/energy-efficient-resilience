@@ -159,11 +159,17 @@ class nnLinearSymQuant(nn.Linear):
 
     def forward(self, input):
         if self.precision > 0:
+            # quantize weights
             quantWeight = SymmetricQuantizeDequantize.apply
-            weight = quantWeight(self.weight, self.precision, self.clamp_val)
-        else:
-            weight = self.weight
-        return F.linear(input, weight, self.bias)
+            quant_weight = quantWeight(
+                self.weight, self.precision, self.clamp_val
+            )
+
+            # quantize inputs
+            quantInput = SymmetricQuantizeDequantize.apply
+            quant_input = quantInput(input, self.precision, self.clamp_val)
+
+        return F.linear(quant_input, quant_weight, self.bias)
 
     def extra_repr(self) -> str:
         return "in_features={}, out_features={}, bias={}, precision={}".format(
@@ -220,15 +226,16 @@ class nnConv2dSymQuant(nn.Conv2d):
 
     def forward(self, input):
         if self.precision > 0:
+            # quantize weights
             quantWeight = SymmetricQuantizeDequantize.apply
             quant_weight = quantWeight(
                 self.weight, self.precision, self.clamp_val
             )
-        else:
-            quant_weight = self.weight
-
+            # quantize inputs
+            quantInput = SymmetricQuantizeDequantize.apply
+            quant_input = quantInput(input, self.precision, self.clamp_val)
         return F.conv2d(
-            input,
+            quant_input,
             quant_weight,
             self.bias,
             self.stride,

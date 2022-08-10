@@ -1,18 +1,18 @@
-Layer name,IFMAP Height,IFMAP Width,Filter Height,Filter Width,Channels,Num Filter,Strides
-features.0,32,32,3,3,3,64,1
-features.3,32,32,3,3,64,64,1
-features.7,16,16,3,3,64,128,1
-features.10,16,16,3,3,128,128,1
-features.14,8,8,3,3,128,256,1
-features.17,8,8,3,3,256,256,1
-features.20,8,8,3,3,256,256,1
-features.23,8,8,3,3,256,256,1
-features.27,4,4,3,3,256,512,1
-features.30,4,4,3,3,512,512,1
-features.33,4,4,3,3,512,512,1
-features.36,4,4,3,3,512,512,1
-features.40,2,2,3,3,512,512,1
-features.43,2,2,3,3,512,512,1
-features.46,2,2,3,3,512,512,1
-features.49,2,2,3,3,512,512,1
-classifier,1,1,1,1,512,10,1
+Layer name,IFMAP Height,IFMAP Width,Filter Height,Filter Width,Channels,Num Filter,Strides,
+features.0,32,32,3,3,3,64,1,
+features.3,32,32,3,3,64,64,1,
+features.7,16,16,3,3,64,128,1,
+features.10,16,16,3,3,128,128,1,
+features.14,8,8,3,3,128,256,1,
+features.17,8,8,3,3,256,256,1,
+features.20,8,8,3,3,256,256,1,
+features.23,8,8,3,3,256,256,1,
+features.27,4,4,3,3,256,512,1,
+features.30,4,4,3,3,512,512,1,
+features.33,4,4,3,3,512,512,1,
+features.36,4,4,3,3,512,512,1,
+features.40,2,2,3,3,512,512,1,
+features.43,2,2,3,3,512,512,1,
+features.46,2,2,3,3,512,512,1,
+features.49,2,2,3,3,512,512,1,
+classifier,1,1,1,1,512,10,1,

@@ -1,10 +1,10 @@
-Layer name,IFMAP Height,IFMAP Width,Filter Height,Filter Width,Channels,Num Filter,Strides
-features.0,32,32,3,3,3,64,1
-features.4,16,16,3,3,64,128,1
-features.8,8,8,3,3,128,256,1
-features.11,8,8,3,3,256,256,1
-features.15,4,4,3,3,256,512,1
-features.18,4,4,3,3,512,512,1
-features.22,2,2,3,3,512,512,1
-features.25,2,2,3,3,512,512,1
-classifier,1,1,1,1,512,10,1
+Layer name,IFMAP Height,IFMAP Width,Filter Height,Filter Width,Channels,Num Filter,Strides,
+features.0,32,32,3,3,3,64,1,
+features.4,16,16,3,3,64,128,1,
+features.8,8,8,3,3,128,256,1,
+features.11,8,8,3,3,256,256,1,
+features.15,4,4,3,3,256,512,1,
+features.18,4,4,3,3,512,512,1,
+features.22,2,2,3,3,512,512,1,
+features.25,2,2,3,3,512,512,1,
+classifier,1,1,1,1,512,10,1,

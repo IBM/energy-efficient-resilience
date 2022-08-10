@@ -1,0 +1,7 @@
+Layer name,IFMAP Height,IFMAP Width,Filter Height,Filter Width,Channels,Num Filter,Strides,
+conv1_1,34,34,3,3,3,32,1,
+conv2_1,18,18,3,3,32,64,1,
+conv3_1,10,10,3,3,64,64,1,
+dconv4_1,10,10,4,4,64,64,1,
+dconv5_1,18,18,4,4,32,64,1,
+dconv6_1,34,34,4,4,3,32,1,

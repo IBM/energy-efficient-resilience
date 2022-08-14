@@ -45,7 +45,7 @@ cfg.endSeed = 50010
 
 # For transform_eval
 cfg.testing_mode = 'visualization' # clean / generator_base / visualization
-cfg.G_PATH = '/home/haolun/energy-efficient-resilience_dev_forRandomImprove/generatorBackup/ConvL/Cifar/ResNet18/EOPM_GeneratorConvLQ_cifar10_arch_resnet18_LR0.001_E_300_ber_0.01_lb_5.0_N_10_step500_NOWE_300.pt'
+cfg.G_PATH = '.'
 
 # For visualization
 cfg.tsneModel = 50000

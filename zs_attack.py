@@ -1,6 +1,8 @@
-import shutil, gc
+import shutil
+import gc
 from unittest import TestLoader
-import torch, os
+import torch
+import os
 from config import cfg
 from models import init_models, init_models_faulty
 from models.generator import (
@@ -129,8 +131,8 @@ def attacking(
     running_preds_std = torch.zeros(0)
     running_preds_adv = torch.zeros(0)
 
-    running_logits_std = torch.zeros(0).detach()
-    running_logits_adv = torch.zeros(0).detach()
+    running_logits_std = torch.zeros(0)
+    running_logits_adv = torch.zeros(0)
 
     images_std = torch.zeros(0)
     images_adv = torch.zeros(0)
@@ -275,15 +277,15 @@ def attacking(
     plt.close("all")
 
     # geometric separability
-    gsi = geometrical_separability_index(
-        reformat_images_std, labels.cpu().detach().numpy()
-    )
-    print("Thornton's Geometric Separability for Normal Images", gsi)
+    # gsi = geometrical_separability_index(
+    #     reformat_images_std, labels.cpu().detach().numpy()
+    # )
+    # print("Thornton's Geometric Separability for Normal Images", gsi)
 
-    gsi = geometrical_separability_index(
-        reformat_images_adv, labels.cpu().detach().numpy()
-    )
-    print("Thornton's Geometric Separability for Adversarial Images", gsi)
+    # gsi = geometrical_separability_index(
+    #     reformat_images_adv, labels.cpu().detach().numpy()
+    # )
+    # print("Thornton's Geometric Separability for Adversarial Images", gsi)
 
     # ---------- EXPERIMENTAL ---------- #
 
@@ -315,7 +317,7 @@ def attacking(
     # plt.close('all')
 
     # separating hyperplane
-    ## select smaller subset of images to tra2in on
+    # select smaller subset of images to tra2in on
     # indices = torch.randperm(tsne_data_std.shape[0])[:500]
     # tsne_data_std = tsne_data_std[indices]
     # tsne_data_adv = tsne_data_adv[indices]

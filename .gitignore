@@ -3,3 +3,6 @@ venv-*
 __pycache__
 dataset
 model_weights
+attack_models
+side_by_side_*
+archive

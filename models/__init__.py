@@ -97,7 +97,9 @@ def init_models(
             return model, checkpoint_epoch
 
         # print("Restoring model from checkpoint", checkpoint_path)
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(
+            checkpoint_path, map_location=torch.device("cpu")
+        )
 
         model.load_state_dict(checkpoint["model_state_dict"])
         # print("restored checkpoint at epoch - ", checkpoint["epoch"])

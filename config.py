@@ -16,7 +16,7 @@ from easydict import EasyDict
 
 cfg = EasyDict()
 
-cfg.machine = "lab"  # TWCC / lab
+cfg.machine = "home"  # TWCC / lab
 
 cfg.faulty_layers = []
 # cfg.faulty_layers = ['l3']
@@ -27,6 +27,8 @@ cfg.batch_size = 512
 cfg.test_batch_size = 100
 cfg.epochs = 2
 cfg.precision = 8
+
+cfg.channels = 3
 
 # cifar10 training parameters
 cfg.learning_rate = 1e-2
@@ -51,11 +53,11 @@ cfg.weight_decay = 5e-4
 
 
 # For setting the machine
-if cfg.machine == "TWCC":
-    cfg.data_dir = "/home/u7590150/dataset"
-    cfg.model_dir = "model_weights/symmetric_signed/"
-    cfg.save_dir = "/home/u7590150/tmp/"
-    cfg.save_dir_curve = "/home/u7590150/tmp_curve/"
+if cfg.machine == "home":
+    cfg.data_dir = "/home/gracen/repos/eerai/dataset"
+    cfg.model_dir = "/home/gracen/repos/eerai/model_weights/"
+    cfg.save_dir = "/home/gracen/repos/eerai/tmp/"
+    cfg.save_dir_curve = "/home/gracen/repos/eerai/tmp_curve/"
 else:
     cfg.data_dir = "/dccstor/epochs/gwallace/eerai/dataset"
     cfg.model_dir = "/dccstor/epochs/gwallace/eerai/model_weights/"

@@ -46,7 +46,7 @@ import zs_train_input_transform_eval as transform_eval
 from config import cfg
 from models import default_base_model_path
 
-# Auto-Attack module
+# Adversarial Attack module
 import zs_attack as attack
 
 np.set_printoptions(threshold=sys.maxsize)
@@ -95,7 +95,7 @@ def main():
             "transform_adversarial_w",
             "transform_adversarial_gen",
             "transform_adversarial_gen_bit",
-            "auto_attack",
+            "attack",
         ],
     )
     parser.add_argument(
@@ -215,16 +215,9 @@ def main():
         default=2,
     )
     group.add_argument(
-        "--norm",
-        type=str,
-        help="Norm to use in Auto-Attack.",
-        choices=["L1", "L2", "Linf"],
-        default="L2",
-    )
-    group.add_argument(
         "--epsilon",
         type=float,
-        help="Epsilon to use in Auto-Attack.",
+        help="Epsilon to use in adversarial attack.",
         default=0.5,
     )
 
@@ -788,8 +781,8 @@ def main():
             args.bit_error_rate,
             args.position,
         )
-    elif args.mode == "auto_attack":
-        print("auto-attack module", args)
+    elif args.mode == "attack":
+        print("adversarial attack module", args)
         attack.attacking(
             testloader,
             args.arch,
@@ -801,7 +794,6 @@ def main():
             cfg.faulty_layers,
             args.bit_error_rate,
             args.position,
-            args.norm,
             args.epsilon,
         )
     else:

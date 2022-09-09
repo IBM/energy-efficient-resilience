@@ -6,3 +6,5 @@ model_weights
 attack_models
 cifar10_adv_images_*
 archive
+**/img_*
+

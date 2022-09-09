@@ -8,6 +8,20 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import numpy as np
+from torch.utils.data import Dataset, DataLoader
+
+
+class AdversarialImageSet(Dataset):
+    def __init__(self, img_loc):
+        self.img_loc = img_loc
+        self.images = torch.load(img_loc)
+
+    def __len__(self):
+        return self.images.shape[0]
+
+    def __getitem__(self, idx):
+        image = self.images[idx]
+        return image
 
 
 # adapted from: https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
@@ -101,6 +115,16 @@ def attacking(
     images_adv = torch.zeros(0)
     labels = torch.zeros(0)
 
+    perturb = True
+
+    adv_tensor_loc = 'cifar10_adv_images_ber_' + \
+        "{:.2f}".format(ber) + "_eps_" + str(epsilon) + '.pth'
+    if os.path.exists(adv_tensor_loc):
+        adv_dataset = AdversarialImageSet(adv_tensor_loc)
+        adv_loader = DataLoader(adv_dataset, batch_size=cfg.test_batch_size)
+        perturb = False
+        iter_adv = iter(adv_loader)
+
     for t, (inputs, classes) in enumerate(test_loader):
         __, (ax1, ax2) = plt.subplots(1, 2)
         index = random.randint(0, cfg.test_batch_size - 1)
@@ -129,10 +153,15 @@ def attacking(
             + str(int(classes[index]))
         )
 
-        perturbed_data = pgd_attack(model, inputs, classes, epsilon=epsilon)
+        if perturb:
+            perturbed_data = pgd_attack(
+                model, inputs, classes, epsilon=epsilon)
+        else:
+            perturbed_data = next(iter_adv)
 
         images_std = torch.cat((images_std, inputs))
         labels = torch.cat((labels, classes))
+
         images_adv = torch.cat((images_adv, perturbed_data))
 
         perturbed_output = model(perturbed_data)
@@ -159,15 +188,15 @@ def attacking(
         plt.close("all")
 
         print(
-            int(t),
+            int(t) + 1,
             "/",
             (int(len(test_loader.dataset) / cfg.test_batch_size)),
             "batches",
             end="\r",
         )
 
-    # adv_tensor = fig_folder + 'adv_images.pth'
-    # torch.save(images_adv, adv_tensor)
+    if perturb:
+        torch.save(images_adv, adv_tensor_loc)
 
     print(
         "\nStandard Eval Accuracy %.3f"
@@ -180,50 +209,6 @@ def attacking(
     )
 
     # ---------------------------- TSNE PLOTS ----------------------------#
-    reformat_images_std = (
-        torch.flatten(images_std, start_dim=1).detach().numpy()
-    )
-    reformat_images_adv = (
-        torch.flatten(images_adv, start_dim=1).detach().numpy()
-    )
-
-    pca_data_std = PCA(n_components=50, svd_solver="full").fit_transform(
-        reformat_images_std
-    )
-
-    pca_data_adv = PCA(n_components=50, svd_solver="full").fit_transform(
-        reformat_images_adv
-    )
-
-    tsne_data_std = torch.zeros(0)
-    tsne_data_adv = torch.zeros(0)
-
-    for i in range(10):
-        tsne_data_std = tsne_data_std + TSNE(
-            n_components=2, verbose=0, perplexity=40, n_iter=300
-        ).fit_transform(pca_data_std)
-        tsne_data_adv = tsne_data_adv + TSNE(
-            n_components=2, verbose=0, perplexity=40, n_iter=300
-        ).fit_transform(pca_data_adv)
-
-    tsne_data_std = tsne_data_std / 10
-    tsne_data_adv = tsne_data_adv / 10
-
-    fig, axes = plt.subplots(2, 5, figsize=(30, 18))
-    for i in range(10):
-        axes.flat[i].set_xlim([-11, 11])
-        axes.flat[i].set_ylim([-11, 11])
-        axes.flat[i].set_title("Class %i\nDistribution" % i)
-    for i in range(labels.shape[0]):
-        axes.flat[int(labels[i])].scatter(
-            tsne_data_std[i, 0], tsne_data_std[i, 1], c="deepskyblue"
-        )
-        axes.flat[int(labels[i])].scatter(
-            tsne_data_adv[i, 0], tsne_data_adv[i, 1], c="hotpink"
-        )
-    plt.savefig(fig_folder + "/tsne_scatter_img.png")
-    plt.close("all")
-
     running_logits_std = np.delete(running_logits_std, 0, axis=0)
     running_logits_adv = np.delete(running_logits_adv, 0, axis=0)
 
@@ -237,6 +222,70 @@ def attacking(
         tsne_data_adv = tsne_data_adv + TSNE(
             n_components=2, verbose=0, perplexity=40, n_iter=300
         ).fit_transform(running_logits_adv)
+        print(
+            i + 1,
+            "/",
+            10,
+            "TSNE runs",
+            end="\r",
+        )
+
+    tsne_data_std = tsne_data_std / 10
+    tsne_data_adv = tsne_data_adv / 10
+
+    colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
+              'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 18))
+    axes.flat[0].set_title("Normal Logits")
+    # axes.flat[0].set_xlim([-6, 4])
+    # axes.flat[0].set_ylim([-3, 3])
+    axes.flat[1].set_title("Adversarial Logits")
+    # axes.flat[1].set_xlim([-6, 4])
+    # axes.flat[1].set_ylim([-3, 3])
+    for i in range(labels.shape[0]):
+        axes.flat[0].scatter(
+            tsne_data_std[i, 0], tsne_data_std[i, 1], c=colors[int(labels[i])]
+        )
+        axes.flat[1].scatter(
+            tsne_data_adv[i, 0], tsne_data_adv[i, 1], c=colors[int(labels[i])]
+        )
+    plt.savefig(fig_folder + "/tsne_scatter_logit.png")
+    plt.close("all")
+
+    reformat_images_std = (
+        torch.flatten(images_std, start_dim=1).detach().numpy()
+    )
+
+    reformat_images_adv = (
+        torch.flatten(images_adv, start_dim=1).detach().numpy()
+    )
+
+    pca_data_std = PCA(n_components=50, svd_solver="full").fit_transform(
+        reformat_images_std
+    )
+
+    pca_data_adv = PCA(n_components=50, svd_solver="full").fit_transform(
+        reformat_images_adv
+    )
+
+    tsne_data_std = torch.zeros((reformat_images_std.shape[0], 2))
+    tsne_data_adv = torch.zeros((reformat_images_adv.shape[0], 2))
+
+    for i in range(10):
+        tsne_data_std = tsne_data_std + TSNE(
+            n_components=2, verbose=0, perplexity=40, n_iter=300
+        ).fit_transform(pca_data_std)
+        tsne_data_adv = tsne_data_adv + TSNE(
+            n_components=2, verbose=0, perplexity=40, n_iter=300
+        ).fit_transform(pca_data_adv)
+        print(
+            i + 1,
+            "/",
+            10,
+            "TSNE runs",
+            end="\r",
+        )
 
     tsne_data_std = tsne_data_std / 10
     tsne_data_adv = tsne_data_adv / 10
@@ -253,9 +302,42 @@ def attacking(
         axes.flat[int(labels[i])].scatter(
             tsne_data_adv[i, 0], tsne_data_adv[i, 1], c="hotpink"
         )
-    plt.savefig(fig_folder + "/tsne_scatter_logit.png")
+    plt.savefig(fig_folder + "/tsne_scatter_img.png")
     plt.close("all")
 
+
+# ---------- EXPERIMENTAL ---------- #
+# running_logits_std = np.delete(running_logits_std, 0, axis=0)
+# running_logits_adv = np.delete(running_logits_adv, 0, axis=0)
+
+# tsne_data_std = np.zeros((running_logits_std.shape[0], 2))
+# tsne_data_adv = np.zeros((running_logits_adv.shape[0], 2))
+
+# for i in range(10):
+#     tsne_data_std = tsne_data_std + TSNE(
+#         n_components=2, verbose=0, perplexity=40, n_iter=300
+#     ).fit_transform(running_logits_std)
+#     tsne_data_adv = tsne_data_adv + TSNE(
+#         n_components=2, verbose=0, perplexity=40, n_iter=300
+#     ).fit_transform(running_logits_adv)
+
+# tsne_data_std = tsne_data_std / 10
+# tsne_data_adv = tsne_data_adv / 10
+
+# fig, axes = plt.subplots(2, 5, figsize=(30, 18))
+# for i in range(10):
+#     # axes.flat[i].set_xlim([-11, 11])
+#     # axes.flat[i].set_ylim([-11, 11])
+#     axes.flat[i].set_title("Class %i\nDistribution" % i)
+# for i in range(labels.shape[0]):
+#     axes.flat[int(labels[i])].scatter(
+#         tsne_data_std[i, 0], tsne_data_std[i, 1], c="deepskyblue"
+#     )
+#     axes.flat[int(labels[i])].scatter(
+#         tsne_data_adv[i, 0], tsne_data_adv[i, 1], c="hotpink"
+#     )
+# plt.savefig(fig_folder + "/tsne_scatter_logit.png")
+# plt.close("all")
 
 # geometric separability
 # gsi = geometrical_separability_index(
@@ -268,7 +350,6 @@ def attacking(
 # )
 # print("Thornton's Geometric Separability for Adversarial Images", gsi)
 
-# ---------- EXPERIMENTAL ---------- #
 
 # cos_sim = cos(running_logits_std, running_logits_adv)
 # print(

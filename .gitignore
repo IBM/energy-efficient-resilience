@@ -4,5 +4,5 @@ __pycache__
 dataset
 model_weights
 attack_models
-# side_by_side_*
+cifar10_adv_images_*
 archive

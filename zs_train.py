@@ -22,6 +22,9 @@ from torch import nn
 from config import cfg
 from models import default_model_path, init_models_faulty, init_models
 
+import torch.nn.utils.prune as prune
+from quantized_ops import zs_quantized_ops
+
 __all__ = ["training"]
 
 debug = False
@@ -99,6 +102,12 @@ def training(
     #    summary(model, (3, 32, 32))
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
+    
+    for name, module in model.named_modules():
+        if isinstance(module, zs_quantized_ops.nnConv2dSymQuant):
+            prune.l1_unstructured(module, name='weight', amount=0.5)
+        elif isinstance(module, zs_quantized_ops.nnLinearSymQuant):
+            prune.l1_unstructured(module, name='weight', amount=0.5)
 
     for x in range(checkpoint_epoch + 1, cfg.epochs):
 
@@ -160,11 +169,24 @@ def training(
             if os.path.exists(model_path) and not force:
                 print("Checkpoint already present ('%s')" % model_path)
                 sys.exit(1)
+                
+            # save pruned weights
+            state_dict = model.state_dict().copy()
+            weight_orig = torch.tensor(0)
+            for key, val in model.state_dict().items():
+                if 'weight_orig' in key:
+                    weight_orig = val
+                if 'weight_mask' in key:
+                    module_name = '.'.join(key.split('.')[:-1])
+                    del state_dict[module_name + '.weight_orig']
+                    del state_dict[module_name + '.weight_mask']
+                    state_dict[module_name + '.weight'] = torch.mul(weight_orig, val)
+                    
 
             torch.save(
                 {
                     "epoch": x,
-                    "model_state_dict": model.state_dict(),
+                    "model_state_dict": state_dict,
                     "optimizer_state_dict": opt.state_dict(),
                     "loss": running_loss / batch_id,
                     "accuracy": accuracy,

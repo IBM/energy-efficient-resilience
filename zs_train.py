@@ -103,6 +103,7 @@ def training(
     # model = torch.nn.DataParallel(model)
     torch.backends.cudnn.benchmark = True
     
+    # easily adjustable pruning options - currently using L1 unstructured
     for name, module in model.named_modules():
         if isinstance(module, zs_quantized_ops.nnConv2dSymQuant):
             prune.l1_unstructured(module, name='weight', amount=0.5)

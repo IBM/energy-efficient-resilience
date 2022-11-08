@@ -34,6 +34,7 @@ layer_loss = {}
 layer_counter = 0
 total_values_dict = {}
 zero_values_dict = {}
+total_mac_ops = {}
 import pdb
 class Program(nn.Module):
     """
@@ -105,18 +106,16 @@ def compute_loss(model_outputs, labels):
 
 def compute_sparsity_loss(lambda_loss):
     #pdb.set_trace()
-    global layer_loss, layer_counter, total_values_dict, zero_values_dict
+    global layer_loss, layer_counter, total_values_dict, zero_values_dict, total_mac_ops
     activation_ = torch.nn.Tanh()
     beta = 100
     layer_wise_density = {}
     total_values_sum = sum(total_values_dict.values())
     zero_values_sum = sum(zero_values_dict.values())
     density = 1-zero_values_sum / total_values_sum
-    #density = sum(1.0-zero_values_dict[x]/total_values_dict[x] for x in zero_values_dict)
-    #for x in zero_values_dict:
-    #    layer_wise_density[x] = 1.0-zero_values_dict[x]/total_values_dict[x] 
     layer_wise_density = [1.0-zero_values_dict[x]/total_values_dict[x] for x in zero_values_dict]
-    #avg_density_per_layer = density / len(zero_values_dict)
+
+    total_macs = [total_mac_ops[x] for x in total_mac_ops]
 #    l_sparsity = sum([torch.norm(x, p=2) for x in layer_loss.values()]) / total_values_sum
     #l_sparsity = sum([torch.sum(activation_(beta * x)) for x in layer_loss.values()])/total_values_sum
     #weighted loss per layer 
@@ -124,16 +123,15 @@ def compute_sparsity_loss(lambda_loss):
     for layer_counter in layer_loss:
         l_sparsity += lambda_loss[layer_counter]* layer_loss[layer_counter]
         #layer_wise_density[layer_counter] = layer_loss[layer_counter]
-    #l_sparsity = sum(cfg.lb[layer_counter]*x for x in layer_loss.values())
 
     #l_sparsity = sum(( torch.sum(activation_(beta * layer_loss[x])) / total_values_dict[x] ) for x in layer_loss)
-    return (l_sparsity, density, layer_wise_density)
+    return (l_sparsity, density, layer_wise_density, total_macs)
 
 
 
 
 def comp_sparsity(self, input, output):
-    global layer_loss, layer_counter, total_values_dict, zero_values_dict
+    global layer_loss, layer_counter, total_values_dict, zero_values_dict, total_mac_ops
 	#if 'ReLU' in self.__class__.__name__ or 'MaxPool2d' in self.__class__.__name__:
 #    if self.is_conv_input:
 #        o_shape = list(output.shape)
@@ -155,8 +153,15 @@ def comp_sparsity(self, input, output):
        # layer_loss[layer_counter] = acts
 
 
-        # tanh loss 
-
+        # compute total MAC operations per image
+        acts = input[0]
+        a_shape = list(acts.shape)
+        o_shape = list(output.shape)
+        w_shape = list(self.weight.shape)
+        total_macs =  a_shape[1] * w_shape[2] * w_shape[3] # per element of the output channel
+        total_macs =  total_macs * o_shape[2] * o_shape[3] # per output channel
+        total_macs = total_macs * o_shape[1] # all output channels
+        total_mac_ops[layer_counter] = total_macs
 
 
 
@@ -180,6 +185,8 @@ def comp_sparsity(self, input, output):
         average_group_density_per_feature = torch.sum(group_density,[1,2]) / (o_shape[2]*o_shape[3])
         batch_group_density = torch.sum(average_group_density_per_feature)/o_shape[0]
         layer_loss[layer_counter] = batch_group_density
+
+        
         layer_counter += 1
         #for b in range(o_shape[0]):
         #    for i in range(o_shape[2]):
@@ -374,7 +381,7 @@ def transform_train(
             out = model(image_adv) 
             loss_orig, pred_orig = compute_loss(out, label)
             running_correct += torch.sum(pred_orig == label.data).item()
-            l_sparsity, density, layerwise_density = compute_sparsity_loss(cfg.lb)
+            l_sparsity, density, layerwise_density,_ = compute_sparsity_loss(cfg.lb)
             total_loss = loss_orig + l_sparsity
             #total_loss = l_sparsity
             running_loss += total_loss.item()
@@ -419,7 +426,7 @@ def accuracy_checking(
     total_test = 0
     correct_train = 0
     correct_test = 0
-    global layer_loss, layer_counter, total_values_dict, zero_values_dict
+    global layer_loss, layer_counter, total_values_dict, zero_values_dict, total_mac_ops
 
     average_density = 0.0
     average_layer_wise_density = []
@@ -428,7 +435,7 @@ def accuracy_checking(
         layer_loss = {}
         total_values_dict = {}
         zero_values_dict = {} 
-
+        total_mac_ops = {}
         total_train += 1
         x, y = x.to(device), y.to(device)
         if use_transform:
@@ -439,7 +446,7 @@ def accuracy_checking(
         _, pred = out.max(1)
         y = y.view(y.size(0))
 
-        _, density, layer_wise_density = compute_sparsity_loss(lambda_loss)
+        _, density, layer_wise_density,_  = compute_sparsity_loss(lambda_loss)
         #average_density += sum(density.cpu().numpy())
         average_density += (density.cpu().numpy())
         if average_layer_wise_density == []:
@@ -464,11 +471,13 @@ def accuracy_checking(
     )
     average_density = 0.0
     average_layer_wise_density = []
+    average_layer_wise_macs = []
     for x, y in testloader:
         layer_counter = 0
         layer_loss = {}
         total_values_dict = {}
         zero_values_dict = {} 
+        total_mac_ops = {}
 
         total_test += 1
         x, y = x.to(device), y.to(device)
@@ -479,7 +488,7 @@ def accuracy_checking(
             out = model(x)
         _, pred = out.max(1)
         y = y.view(y.size(0))
-        _, density, layer_wise_density = compute_sparsity_loss(lambda_loss)
+        _, density, layer_wise_density, macs = compute_sparsity_loss(lambda_loss)
         #average_density += sum(density.cpu().numpy())
         average_density += (density.cpu().numpy())
             
@@ -487,24 +496,29 @@ def accuracy_checking(
 
         if average_layer_wise_density == []:
             average_layer_wise_density = [0.0 for x in layer_wise_density]
+            average_layer_wise_macs = [0 for x in layer_wise_density]
         for layer_num in range(len(average_layer_wise_density)):
             average_layer_wise_density[layer_num] += torch.sum(layer_wise_density[layer_num]).cpu().numpy()
+            average_layer_wise_macs[layer_num] += (macs[layer_num])
         correct_test += torch.sum(pred == y.data).item()
     accuracy_test = correct_test / (len(testloader.dataset))
     for layer_num in range(len(average_layer_wise_density)):
         average_layer_wise_density[layer_num] = average_layer_wise_density[layer_num] / len(testloader)
+        average_layer_wise_macs[layer_num] = average_layer_wise_macs[layer_num] / len(testloader)
 
     print(
             "Density of activations with testing data {:.6f}".format(
         average_density/len(testloader))
     )
     print(average_layer_wise_density)
+    print("total mac ops with testing data %d"%(mac_ops/len(testloader)))
+    
 
 
     print("Accuracy of training data {:5f}".format(accuracy_train))
     print("Accuracy of testing data {:5f}".format(accuracy_test))
    
-    logger.visualize()
+    #logger.visualize()
     #stats.inspect_model(model)
     return accuracy_train, accuracy_test
 

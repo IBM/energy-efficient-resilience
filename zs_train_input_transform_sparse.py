@@ -56,6 +56,7 @@ class Program(nn.Module):
         init_p = torch.ones((self.cfg.channels, self.cfg.h1, self.cfg.w1))
         #self.P = Parameter(init_p, requires_grad=True)
         self.P = Parameter((torch.randn(init_p.shape) * 2 - 1) * 0.0001, requires_grad=True)
+        #self.P = Parameter(torch.randn(init_p.shape), requires_grad=True)
         if transform_path is not None:
             self.P = torch.load(transform_path, map_location=torch.device(device))['input_transform']
 
@@ -78,19 +79,22 @@ class Program(nn.Module):
         #x_adv = torch.clamp(x_adv, min=-1, max=1)
 
 
-        #x_adv = self.tanh_fn(x+self.P)
+        #x_adv = torch.tanh(x+self.P)
         #print(torch.min(x_adv), torch.max(x_adv))
         #x_adv = (x_adv - tmean)/tstd
         #print(torch.min(x_adv), torch.max(x_adv))
         
-        x_adv = torch.clamp(x+self.P, 0.0, 1.0)
-        x_adv = (x_adv - tmean) / tstd
-
-        #x_adv = 2 * x - 1
-        #x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
-        #x_adv = 0.5 * x_adv + 0.5
+        #x_adv = torch.clamp(x+self.P, 0.0, 1.0)
         #x_adv = (x_adv - tmean) / tstd
 
+        x_adv = 2 * x - 1
+        x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        x_adv = 0.5 * x_adv + 0.5
+        x_adv = (x_adv - tmean) / tstd
+        #x_adv = x
+        #x_adv = torch.tanh((torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        #x_adv = (x_adv - tmean) / tstd
+        pdb.set_trace()
         return x_adv
 
 
@@ -144,50 +148,53 @@ def comp_sparsity(self, input, output):
 #        layer_loss[layer_counter] = output
 
     if "Conv2d" in self.__class__.__name__:
-       # acts = input[0]
-       # o_shape = list(acts.shape)
-       # total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
-       # zero_values = torch.sum(acts == 0)
-       # total_values_dict[layer_counter] = total_values
-       # zero_values_dict[layer_counter] = zero_values
-       # layer_loss[layer_counter] = acts
+
+        if layer_counter < 50:
+            #acts = input[0]
+            #o_shape = list(acts.shape)
+            #total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
+            #zero_values = torch.sum(acts == 0)
+            #total_values_dict[layer_counter] = total_values
+            #zero_values_dict[layer_counter] = zero_values
+            #layer_loss[layer_counter] = acts
 
 
-        # compute total MAC operations per image
-        acts = input[0]
-        a_shape = list(acts.shape)
-        o_shape = list(output.shape)
-        w_shape = list(self.weight.shape)
-        total_macs =  a_shape[1] * w_shape[2] * w_shape[3] # per element of the output channel
-        total_macs =  total_macs * o_shape[2] * o_shape[3] # per output channel
-        total_macs = total_macs * o_shape[1] # all output channels
-        total_mac_ops[layer_counter] = total_macs
+            # compute total MAC operations per image
+            acts = input[0]
+            a_shape = list(acts.shape)
+            o_shape = list(output.shape)
+            w_shape = list(self.weight.shape)
+            total_macs =  a_shape[1] * w_shape[2] * w_shape[3] # per element of the output channel
+            total_macs =  total_macs * o_shape[2] * o_shape[3] # per output channel
+            total_macs = total_macs * o_shape[1] # all output channels ;
+            total_macs = total_macs * o_shape[0]
+            total_mac_ops[layer_counter] = total_macs
 
 
 
-        # L2 norm based loss 
+            # L2 norm based loss 
 
-        # group activations together and find density per group
-        # Group tanh loss
-        ind=0
-        activation_ = torch.nn.Tanh()
-        acts = input[0]
-        beta = 100
-        o_shape = list(acts.shape)
-        total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
-        zero_values = torch.sum(acts == 0)
-        total_values_dict[layer_counter] = total_values
-        zero_values_dict[layer_counter] = zero_values
-        
-        #pdb.set_trace()
-        # sum along channels 
-        group_density = torch.sum(activation_(beta*acts), 1) / o_shape[1] 
-        average_group_density_per_feature = torch.sum(group_density,[1,2]) / (o_shape[2]*o_shape[3])
-        batch_group_density = torch.sum(average_group_density_per_feature)/o_shape[0]
-        layer_loss[layer_counter] = batch_group_density
+            # group activations together and find density per group
+            # Group tanh loss
+            ind=0
+            activation_ = torch.nn.Tanh()
+            acts = input[0]
+            beta = 100
+            o_shape = list(acts.shape)
+            total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
+            zero_values = torch.sum(acts == 0)
+            total_values_dict[layer_counter] = total_values
+            zero_values_dict[layer_counter] = zero_values
+            
+            #pdb.set_trace()
+            # sum along channels 
+            group_density = torch.sum(activation_(beta*acts), 1) / o_shape[1] 
+            average_group_density_per_feature = torch.sum(group_density,[1,2]) / (o_shape[2]*o_shape[3])
+            batch_group_density = torch.sum(average_group_density_per_feature)/o_shape[0]
+            layer_loss[layer_counter] = batch_group_density
 
-        
-        layer_counter += 1
+            
+            layer_counter += 1
         #for b in range(o_shape[0]):
         #    for i in range(o_shape[2]):
         #        for j in range(o_shape[3]):
@@ -331,7 +338,7 @@ def transform_train(
 
 
     #assert checkpoint_epoch == checkpoint_epoch_perturbed
-
+    stats.inspect_model(model)
     init_hooks(arch, model)
     Pg = Program(cfg, None)
     model, Pg = (
@@ -350,8 +357,8 @@ def transform_train(
         betas=(0.5, 0.999),
         weight_decay=cfg.weight_decay,
     )
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=100, gamma=cfg.lr_decay
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, milestones=cfg.lr_step, gamma=cfg.lr_decay
     )
     global layer_loss, layer_counter, total_values_dict, zero_values_dict
 
@@ -511,7 +518,9 @@ def accuracy_checking(
         average_density/len(testloader))
     )
     print(average_layer_wise_density)
-    print("total mac ops with testing data %d"%(mac_ops/len(testloader)))
+    print("total mac ops")
+    print(macs)
+    #print("total mac ops with testing data %d"%(mac_ops/len(testloader)))
     
 
 

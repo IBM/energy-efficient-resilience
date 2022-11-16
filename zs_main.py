@@ -22,16 +22,17 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 
-# Sinlge model
+# Single model
 import zs_test as test
 import zs_train as train
-import zs_train_sparse as sptrain
+# import zs_train_sparse as sptrain
 
 import zs_train_input_transform_sparse as sparse
 
 import zs_train_input_transform_single as transform_single
 import zs_train_input_transform_single_gen as transform_single_gen
 import zs_train_input_transform_single_attention as transform_single_attention
+import zs_train_sam as train_sam
 
 import zs_train_input_transform_activation as transform_activation
 
@@ -76,7 +77,7 @@ def main():
                 "transform_single_gen","transform_eopm_gen",
                  "transform_eopm", "transform_mlp_eopm", 
                  "transform_adversarial", "transform_mlp_adversarial", "transform_adversarial_w", 
-                 "transform_adversarial_gen", "transform_adversarial_gen_bit", "sparse",
+                 "transform_adversarial_gen", "transform_adversarial_gen_bit", "sparse", "train_sam"
                 ],
     )
     parser.add_argument(
@@ -144,7 +145,7 @@ def main():
         "--learning_rate",
         type=float,
         help="Learning rate for training input transformation of training clean model.",
-        default=5,
+        default=1e-2,
     )
     group.add_argument(
         "-LM",
@@ -190,11 +191,11 @@ def main():
     )
 
     args = parser.parse_args()
-    #cfg.epochs = args.epochs
-    #cfg.learning_rate = args.learning_rate
-    #cfg.batch_size = args.batch_size
-    #cfg.test_batch_size = args.test_batch_size
-    #cfg.lb = args.lambdaVal
+    cfg.epochs = args.epochs
+    cfg.learning_rate = args.learning_rate
+    cfg.batch_size = args.batch_size
+    cfg.test_batch_size = args.test_batch_size
+    cfg.lb = args.lambdaVal
     cfg.N = args.N_perturbed_model
     cfg.G = args.Generator
     cfg.PGD_STEP = args.pgd_step
@@ -488,7 +489,7 @@ def main():
 
     if args.mode == "train":
         print("training args", args)
-        sptrain.training(
+        train.training(
             trainloader,
             args.arch,
             dataset,
@@ -759,6 +760,22 @@ def main():
             in_channels,
             cfg.precision,
             args.checkpoint,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "train_sam":
+        print("train model with SAM", args)
+        train_sam.training(
+            trainloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.retrain,
+            args.checkpoint,
+            args.force,
             device,
             cfg.faulty_layers,
             args.bit_error_rate,

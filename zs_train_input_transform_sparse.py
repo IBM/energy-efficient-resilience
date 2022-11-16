@@ -87,14 +87,14 @@ class Program(nn.Module):
         #x_adv = torch.clamp(x+self.P, 0.0, 1.0)
         #x_adv = (x_adv - tmean) / tstd
 
-        x_adv = 2 * x - 1
-        x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
-        x_adv = 0.5 * x_adv + 0.5
-        x_adv = (x_adv - tmean) / tstd
-        #x_adv = x
-        #x_adv = torch.tanh((torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        #pdb.set_trace()
+        #x_adv = 2 * x - 1
+        #x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        #x_adv = 0.5 * x_adv + 0.5
         #x_adv = (x_adv - tmean) / tstd
-        pdb.set_trace()
+        x_adv = x
+        x_adv = torch.tanh((torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        #x_adv = (x_adv - tmean) / tstd
         return x_adv
 
 

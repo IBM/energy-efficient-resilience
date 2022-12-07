@@ -381,7 +381,7 @@ def transform_train(
     #accuracy_checking(model, trainloader, testloader, Pg, sparsityWt, device, use_transform=True)
 
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, [Pg.parameters(), Opg.parameters()]),
+        filter(lambda p: p.requires_grad, Opg.parameters()),
         lr=cfg.learning_rate,
         betas=(0.5, 0.999),
         weight_decay=cfg.weight_decay,
@@ -423,8 +423,8 @@ def transform_train(
             #print(torch.min(Pg.P), torch.max(Pg.P))
             out = model(image_adv) 
             
-            #logits_adv = Opg(out)
-            logits_adv = out
+            logits_adv = Opg(out)
+            #logits_adv = out
             
             loss_orig, pred_orig = compute_loss(logits_adv, label)
             running_correct += torch.sum(pred_orig == label.data).item()

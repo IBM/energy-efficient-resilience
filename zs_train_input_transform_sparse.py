@@ -30,6 +30,8 @@ from functools import reduce
 torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+#sparsityWt = [0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0]
+sparsityWt = [0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0]
 layer_loss = {}
 layer_counter = 0
 total_values_dict = {}
@@ -49,16 +51,18 @@ class Program(nn.Module):
 	
 
         self.P = None
+
         self.init_transform(transform_path)
 
     # Initialize Perturbation
     def init_transform(self, transform_path):
         init_p = torch.ones((self.cfg.channels, self.cfg.h1, self.cfg.w1))
         #self.P = Parameter(init_p, requires_grad=True)
-        self.P = Parameter((torch.randn(init_p.shape) * 2 - 1) * 0.0001, requires_grad=True)
-        #self.P = Parameter(torch.randn(init_p.shape), requires_grad=True)
+        self.P = Parameter((torch.rand(init_p.shape)) * 0.0001, requires_grad=True)
+        #self.P = Parameter((torch.randn(init_p.shape) * 2 - 1) * 0.0001, requires_grad=True)
         if transform_path is not None:
             self.P = torch.load(transform_path, map_location=torch.device(device))['input_transform']
+
 
     def forward(self, image):
         mean = np.array([0.4914, 0.4822, 0.4465], dtype=np.float32)
@@ -69,19 +73,15 @@ class Program(nn.Module):
         tstd = Parameter(torch.from_numpy(std), requires_grad=False)
         tmean = tmean.to(device)
         tstd = tstd.to(device)
-
         x = image.data.clone()
-        #print(torch.min(x), torch.max(x))
-        #y = (x - tmean)/tstd
-        #print(torch.min(y), torch.max(y))
-        #pdb.set_trace()
-        #x_adv = x + self.tanh_fn(self.P)
-        #x_adv = torch.clamp(x_adv, min=-1, max=1)
-
-
-        #x_adv = torch.tanh(x+self.P)
-        #print(torch.min(x_adv), torch.max(x_adv))
+        #x_adv = x + torch.tanh(self.P)
         #x_adv = (x_adv - tmean)/tstd
+        #print(torch.min(x_adv), torch.max(x_adv))
+
+
+        x_adv = torch.tanh(x+self.P)
+        #print(torch.min(x_adv), torch.max(x_adv))
+        x_adv = (x_adv - tmean)/tstd
         #print(torch.min(x_adv), torch.max(x_adv))
         
         #x_adv = torch.clamp(x+self.P, 0.0, 1.0)
@@ -92,10 +92,37 @@ class Program(nn.Module):
         #x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
         #x_adv = 0.5 * x_adv + 0.5
         #x_adv = (x_adv - tmean) / tstd
-        x_adv = x
-        x_adv = torch.tanh((torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        #x_adv = x
+        #x_adv = torch.tanh((torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        #print(torch.min(x_adv), torch.max(x_adv))
         #x_adv = (x_adv - tmean) / tstd
         return x_adv
+
+class OutProgram(nn.Module):
+    """
+    Apply reprogramming to output logits.
+    """
+	
+
+    def __init__(self, cfg, transform_path):
+        super(OutProgram, self).__init__()
+        self.num_classes = 10
+        self.cfg=cfg 
+        self.P_out = None
+        self.init_transform(transform_path)
+
+    # Initialize Perturbation
+    def init_transform(self, transform_path):
+        init_p = torch.ones((self.num_classes))
+        self.P_out = Parameter((torch.rand(init_p.shape)) * 0.01, requires_grad=True)
+        #if transform_path is not None:
+        #    self.P_out = torch.load(transform_path, map_location=torch.device(device))['input_transform']
+
+
+    def forward(self, logits):
+        logits_t = logits.data.clone()
+        logits_t += torch.tanh(self.P_out)
+        return logits_t
 
 
 def compute_loss(model_outputs, labels):
@@ -124,8 +151,8 @@ def compute_sparsity_loss(lambda_loss):
     #l_sparsity = sum([torch.sum(activation_(beta * x)) for x in layer_loss.values()])/total_values_sum
     #weighted loss per layer 
     l_sparsity = 0
-    for layer_counter in layer_loss:
-        l_sparsity += lambda_loss[layer_counter]* layer_loss[layer_counter]
+    for lc in layer_loss:
+        l_sparsity += lambda_loss[lc]* layer_loss[lc]
         #layer_wise_density[layer_counter] = layer_loss[layer_counter]
 
     #l_sparsity = sum(( torch.sum(activation_(beta * layer_loss[x])) / total_values_dict[x] ) for x in layer_loss)
@@ -149,52 +176,51 @@ def comp_sparsity(self, input, output):
 
     if "Conv2d" in self.__class__.__name__:
 
-        if layer_counter < 50:
-            #acts = input[0]
-            #o_shape = list(acts.shape)
-            #total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
-            #zero_values = torch.sum(acts == 0)
-            #total_values_dict[layer_counter] = total_values
-            #zero_values_dict[layer_counter] = zero_values
-            #layer_loss[layer_counter] = acts
+        #acts = input[0]
+        #o_shape = list(acts.shape)
+        #total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
+        #zero_values = torch.sum(acts == 0)
+        #total_values_dict[layer_counter] = total_values
+        #zero_values_dict[layer_counter] = zero_values
+        #layer_loss[layer_counter] = acts
 
 
-            # compute total MAC operations per image
-            acts = input[0]
-            a_shape = list(acts.shape)
-            o_shape = list(output.shape)
-            w_shape = list(self.weight.shape)
-            total_macs =  a_shape[1] * w_shape[2] * w_shape[3] # per element of the output channel
-            total_macs =  total_macs * o_shape[2] * o_shape[3] # per output channel
-            total_macs = total_macs * o_shape[1] # all output channels ;
-            total_macs = total_macs * o_shape[0]
-            total_mac_ops[layer_counter] = total_macs
+        # compute total MAC operations per image
+        acts = input[0]
+        a_shape = list(acts.shape)
+        o_shape = list(output.shape)
+        w_shape = list(self.weight.shape)
+        total_macs =  a_shape[1] * w_shape[2] * w_shape[3] # per element of the output channel
+        total_macs =  total_macs * o_shape[2] * o_shape[3] # per output channel
+        total_macs = total_macs * o_shape[1] # all output channels ;
+        total_macs = total_macs * o_shape[0]
+        total_mac_ops[layer_counter] = total_macs
 
 
 
-            # L2 norm based loss 
+        # L2 norm based loss 
 
-            # group activations together and find density per group
-            # Group tanh loss
-            ind=0
-            activation_ = torch.nn.Tanh()
-            acts = input[0]
-            beta = 100
-            o_shape = list(acts.shape)
-            total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
-            zero_values = torch.sum(acts == 0)
-            total_values_dict[layer_counter] = total_values
-            zero_values_dict[layer_counter] = zero_values
-            
-            #pdb.set_trace()
-            # sum along channels 
-            group_density = torch.sum(activation_(beta*acts), 1) / o_shape[1] 
-            average_group_density_per_feature = torch.sum(group_density,[1,2]) / (o_shape[2]*o_shape[3])
-            batch_group_density = torch.sum(average_group_density_per_feature)/o_shape[0]
-            layer_loss[layer_counter] = batch_group_density
+        # group activations together and find density per group
+        # Group tanh loss
+        ind=0
+        activation_ = torch.nn.Tanh()
+        acts = input[0]
+        beta = 100
+        o_shape = list(acts.shape)
+        total_values = o_shape[0] * o_shape[1] * o_shape[2] * o_shape[3]
+        zero_values = torch.sum(acts == 0)
+        total_values_dict[layer_counter] = total_values
+        zero_values_dict[layer_counter] = zero_values
+        
+        #pdb.set_trace()
+        # sum along channels 
+        group_density = torch.sum(activation_(beta*acts), 1) / o_shape[1] 
+        average_group_density_per_feature = torch.sum(group_density,[1,2]) / (o_shape[2]*o_shape[3])
+        batch_group_density = torch.sum(average_group_density_per_feature)/o_shape[0]
+        layer_loss[layer_counter] = batch_group_density
 
-            
-            layer_counter += 1
+        
+        layer_counter += 1
         #for b in range(o_shape[0]):
         #    for i in range(o_shape[2]):
         #        for j in range(o_shape[3]):
@@ -338,31 +364,40 @@ def transform_train(
 
 
     #assert checkpoint_epoch == checkpoint_epoch_perturbed
-    stats.inspect_model(model)
+    #stats.inspect_model(model)
     init_hooks(arch, model)
     Pg = Program(cfg, None)
-    model, Pg = (
+    Opg = OutProgram(cfg, None)
+
+    model, Pg , Opg = (
         model.to(device),
-        Pg.to(device)
+        Pg.to(device),
+        Opg.to(device)
     )
 
     model.eval()
 
     #accuracy_checking(model, trainloader, testloader, Pg, device, use_transform=False)
-    accuracy_checking(model, trainloader, testloader, Pg, cfg.lb, device, use_transform=True)
+    #accuracy_checking(model, trainloader, testloader, Pg, sparsityWt, device, use_transform=True)
 
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, Pg.parameters()),
+        filter(lambda p: p.requires_grad, [Pg.parameters(), Opg.parameters()]),
         lr=cfg.learning_rate,
         betas=(0.5, 0.999),
         weight_decay=cfg.weight_decay,
     )
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=cfg.lr_step, gamma=cfg.lr_decay
+
+    #optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, [Pg.parameters()]),lr=cfg.learning_rate,betas=(0.5, 0.999),weight_decay=cfg.weight_decay)
+
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=cfg.lr_step, gamma=cfg.lr_decay
     )
     global layer_loss, layer_counter, total_values_dict, zero_values_dict
 
     for name, param in Pg.named_parameters():
+        print("Param name: {}, grads is: {}".format(name, param.requires_grad))
+
+    for name, param in Opg.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
     print(
@@ -385,10 +420,15 @@ def transform_train(
             total_loss = 0  
             image, label = image.to(device), label.to(device)
             image_adv = Pg(image)  
+            #print(torch.min(Pg.P), torch.max(Pg.P))
             out = model(image_adv) 
-            loss_orig, pred_orig = compute_loss(out, label)
+            
+            #logits_adv = Opg(out)
+            logits_adv = out
+            
+            loss_orig, pred_orig = compute_loss(logits_adv, label)
             running_correct += torch.sum(pred_orig == label.data).item()
-            l_sparsity, density, layerwise_density,_ = compute_sparsity_loss(cfg.lb)
+            l_sparsity, density, layerwise_density,_ = compute_sparsity_loss(sparsityWt)
             total_loss = loss_orig + l_sparsity
             #total_loss = l_sparsity
             running_loss += total_loss.item()
@@ -397,7 +437,6 @@ def transform_train(
             # Pg.zero_grad()
             total_loss.backward()
             optimizer.step()
-            #print(Pg.P.grad)
             
             
             
@@ -418,7 +457,7 @@ def transform_train(
         #    accuracy_checking(model, trainloader, testloader, Pg, device, use_transform=True)
         if (epoch + 1) % 20 == 0 or (epoch + 1) == cfg.epochs:
             torch.save({'input_transform': Pg.P},'{}/{}_W_{}.pt'.format(cfg.save_dir, arch, epoch + 1))
-            accuracy_checking(model, trainloader, testloader, Pg, cfg.lb, device, use_transform=True)
+            accuracy_checking(model, trainloader, testloader, Pg, sparsityWt, device, use_transform=True)
 
             #lb += 0.5
             #print("Lambda value: ", lb)

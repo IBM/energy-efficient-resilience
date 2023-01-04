@@ -79,19 +79,19 @@ class Program(nn.Module):
         #print(torch.min(x_adv), torch.max(x_adv))
 
 
-        x_adv = torch.tanh(x+self.P)
+        #x_adv = torch.tanh(x+self.P)
         #print(torch.min(x_adv), torch.max(x_adv))
-        x_adv = (x_adv - tmean)/tstd
+        #x_adv = (x_adv - tmean)/tstd
         #print(torch.min(x_adv), torch.max(x_adv))
         
         #x_adv = torch.clamp(x+self.P, 0.0, 1.0)
         #x_adv = (x_adv - tmean) / tstd
 
         #pdb.set_trace()
-        #x_adv = 2 * x - 1
-        #x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
-        #x_adv = 0.5 * x_adv + 0.5
-        #x_adv = (x_adv - tmean) / tstd
+        x_adv = 2 * x - 1
+        x_adv = torch.tanh(0.5 * (torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
+        x_adv = 0.5 * x_adv + 0.5
+        x_adv = (x_adv - tmean) / tstd
         #x_adv = x
         #x_adv = torch.tanh((torch.log(1 + x_adv + 1e-15) - torch.log(1 - x_adv + 1e-15)) + self.P)
         #print(torch.min(x_adv), torch.max(x_adv))
@@ -107,21 +107,22 @@ class OutProgram(nn.Module):
     def __init__(self, cfg, transform_path):
         super(OutProgram, self).__init__()
         self.num_classes = 10
-        self.cfg=cfg 
-        self.P_out = None
-        self.init_transform(transform_path)
+        self.cfg=cfg
+        self.out_transform = torch.nn.Linear(self.num_classes, self.num_classes)
+        #self.P_out = None
+        #self.init_transform(transform_path)
 
     # Initialize Perturbation
-    def init_transform(self, transform_path):
-        init_p = torch.ones((self.num_classes))
-        self.P_out = Parameter((torch.rand(init_p.shape)) * 0.01, requires_grad=True)
+    #def init_transform(self, transform_path):
+    #    init_p = torch.ones((self.num_classes))
+    #    self.P_out = Parameter((torch.randn(init_p.shape)) * 0.01, requires_grad=True)
         #if transform_path is not None:
         #    self.P_out = torch.load(transform_path, map_location=torch.device(device))['input_transform']
 
 
     def forward(self, logits):
         logits_t = logits.data.clone()
-        logits_t += torch.tanh(self.P_out)
+        logits_t = self.out_transform(logits_t)
         return logits_t
 
 
@@ -379,9 +380,14 @@ def transform_train(
 
     #accuracy_checking(model, trainloader, testloader, Pg, device, use_transform=False)
     #accuracy_checking(model, trainloader, testloader, Pg, sparsityWt, device, use_transform=True)
-
+    params = []
+    for param in Pg.parameters():
+        params.append(param)
+    for param in Opg.parameters():
+        params.append(param)
+    
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, Opg.parameters()),
+        filter(lambda p: p.requires_grad, params),
         lr=cfg.learning_rate,
         betas=(0.5, 0.999),
         weight_decay=cfg.weight_decay,
@@ -397,7 +403,7 @@ def transform_train(
     for name, param in Pg.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
-    for name, param in Opg.named_parameters():
+    for name, param in Opg.parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
     print(
@@ -423,10 +429,10 @@ def transform_train(
             #print(torch.min(Pg.P), torch.max(Pg.P))
             out = model(image_adv) 
             
-            logits_adv = Opg(out)
+            #logits_adv = Opg(out)
             #logits_adv = out
             
-            loss_orig, pred_orig = compute_loss(logits_adv, label)
+            loss_orig, pred_orig = compute_loss(out, label)
             running_correct += torch.sum(pred_orig == label.data).item()
             l_sparsity, density, layerwise_density,_ = compute_sparsity_loss(sparsityWt)
             total_loss = loss_orig + l_sparsity

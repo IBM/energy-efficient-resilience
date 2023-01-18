@@ -76,6 +76,7 @@ def training(
     :param force: Overwrite checkpoint.
     :param device: A string. Specify using GPU or CPU.
     """
+    cfg.lr_step = 100
 
     model, checkpoint_epoch = init_models(arch, 3, precision, retrain, checkpoint_path, dataset) # Quantization Aware Training without using bit error!
 
@@ -104,11 +105,11 @@ def training(
     torch.backends.cudnn.benchmark = True
     
     # easily adjustable pruning options - currently using L1 unstructured
-    for name, module in model.named_modules():
-        if isinstance(module, zs_quantized_ops.nnConv2dSymQuant):
-            prune.l1_unstructured(module, name='weight', amount=0.5)
-        elif isinstance(module, zs_quantized_ops.nnLinearSymQuant):
-            prune.l1_unstructured(module, name='weight', amount=0.5)
+    # for name, module in model.named_modules():
+    #     if isinstance(module, zs_quantized_ops.nnConv2dSymQuant):
+    #         prune.l1_unstructured(module, name='weight', amount=0.5)
+    #     elif isinstance(module, zs_quantized_ops.nnLinearSymQuant):
+    #         prune.l1_unstructured(module, name='weight', amount=0.5)
 
     for x in range(checkpoint_epoch + 1, cfg.epochs):
 
@@ -173,15 +174,15 @@ def training(
                 
             # save pruned weights
             state_dict = model.state_dict().copy()
-            weight_orig = torch.tensor(0)
-            for key, val in model.state_dict().items():
-                if 'weight_orig' in key:
-                    weight_orig = val
-                if 'weight_mask' in key:
-                    module_name = '.'.join(key.split('.')[:-1])
-                    del state_dict[module_name + '.weight_orig']
-                    del state_dict[module_name + '.weight_mask']
-                    state_dict[module_name + '.weight'] = torch.mul(weight_orig, val)
+            # weight_orig = torch.tensor(0)
+            # for key, val in model.state_dict().items():
+            #     if 'weight_orig' in key:
+            #         weight_orig = val
+            #     if 'weight_mask' in key:
+            #         module_name = '.'.join(key.split('.')[:-1])
+            #         del state_dict[module_name + '.weight_orig']
+            #         del state_dict[module_name + '.weight_mask']
+            #         state_dict[module_name + '.weight'] = torch.mul(weight_orig, val)
                     
 
             torch.save(

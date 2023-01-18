@@ -33,6 +33,7 @@ import zs_train_input_transform_single as transform_single
 import zs_train_input_transform_single_gen as transform_single_gen
 import zs_train_input_transform_single_attention as transform_single_attention
 import zs_train_sam as train_sam
+import zs_train_maxup as train_maxup
 
 import zs_train_input_transform_activation as transform_activation
 
@@ -77,7 +78,8 @@ def main():
                 "transform_single_gen","transform_eopm_gen",
                  "transform_eopm", "transform_mlp_eopm", 
                  "transform_adversarial", "transform_mlp_adversarial", "transform_adversarial_w", 
-                 "transform_adversarial_gen", "transform_adversarial_gen_bit", "sparse", "train_sam"
+                 "transform_adversarial_gen", "transform_adversarial_gen_bit", "sparse", "train_sam",
+                 "train_maxup"
                 ],
     )
     parser.add_argument(
@@ -236,7 +238,7 @@ def main():
             transform=transform_train,
         )
         trainloader = torch.utils.data.DataLoader(
-            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=8
+            trainset, batch_size=cfg.batch_size, shuffle=True, num_workers=2
         )
 
         testset = torchvision.datasets.CIFAR10(
@@ -768,6 +770,22 @@ def main():
     elif args.mode == "train_sam":
         print("train model with SAM", args)
         train_sam.training(
+            trainloader,
+            args.arch,
+            dataset,
+            in_channels,
+            cfg.precision,
+            args.retrain,
+            args.checkpoint,
+            args.force,
+            device,
+            cfg.faulty_layers,
+            args.bit_error_rate,
+            args.position,
+        )
+    elif args.mode == "train_maxup":
+        print("train model with MaxUp", args)
+        train_maxup.training(
             trainloader,
             args.arch,
             dataset,

@@ -15,7 +15,15 @@
 import torch
 
 import zs_hooks_stats as stats
-from models import init_models_faulty
+from models import init_models_faulty, init_models
+
+# import loss_landscapes
+# import loss_landscapes.metrics
+
+import matplotlib
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
+import numpy as np
 
 debug = False
 visualize = False
@@ -33,6 +41,9 @@ def inference(
     ber,
     position,
 ):
+    # print(torch.version.cuda)
+    # print(torch.__version__)
+    
     model, checkpoint_epoch = init_models_faulty(
         arch,
         in_channels,
@@ -81,3 +92,19 @@ def inference(
         "Eval Accuracy %.3f"
         % (running_correct.double() / (len(testloader.dataset)))
     )
+    
+    # STEPS = 100
+    # x, y = iter(testloader).__next__()
+    # criterion = torch.nn.CrossEntropyLoss()
+    # metric = loss_landscapes.metrics.Loss(criterion, x, y)
+    # loss_data = loss_landscapes.random_plane(model, metric, 10, STEPS, normalization='filter')
+    
+    # fig = plt.figure()
+    # ax = plt.axes(projection='3d')
+    # X = np.array([[j for j in range(STEPS)] for i in range(STEPS)])
+    # Y = np.array([[i for _ in range(STEPS)] for i in range(STEPS)])
+    # ax.plot_surface(X, Y, loss_data, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
+    # ax.set_title('Surface Plot of Loss Landscape')
+    # plt.savefig('loss_landscape.png')
+
+

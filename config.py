@@ -23,16 +23,16 @@ cfg.faulty_layers = []
 #cfg.faulty_layers = ['conv', 'l1', 'l2', 'l3', 'l4', 'linear']  # For ResNet18
 # cfg.faulty_layers = ["linear", "conv"]
 
-cfg.batch_size = 512
-cfg.test_batch_size = 100
-cfg.epochs = 2
+# cfg.batch_size = 128
+# cfg.test_batch_size = 128
+# cfg.epochs = 2
 cfg.precision = 8
 
 # cifar10 training parameters
-cfg.learning_rate = 1e-2
-cfg.lr_decay = 0.1
-cfg.lr_step = [100]
-cfg.weight_decay = 5e-4
+# cfg.learning_rate = 1e-2
+# cfg.lr_decay = 0.1
+# cfg.lr_step = [100]
+# cfg.weight_decay = 5e-4
 
 #cifar100 training parameters
 #cfg.learning_rate = 1e-2
@@ -41,13 +41,15 @@ cfg.weight_decay = 5e-4
 #cfg.weight_decay = 5e-4
 
 # Nandhini - sparsity experiments 
-#cfg.learning_rate = 1e-3
-#cfg.lr_decay = 1.0
-#cfg.weight_decay = 5e-4
-#cfg.w1 = 32  # 28 #224
-#cfg.h1 = 32  # 28 #224
-#cfg.w2 = 32  # 32 28 #224
-#cfg.h2 = 32  # 32 28 #224
+# cfg.learning_rate = 0.006181480331196126
+# cfg.lr_decay = 1.0
+# cfg.weight_decay = 0.0007434746665002521
+# cfg.lr_step = [100]
+cfg.w1 = 32  # 28 #224
+cfg.h1 = 32  # 28 #224
+cfg.w2 = 32  # 32 28 #224
+cfg.h2 = 32  # 32 28 #224
+cfg.channels = 3
 
 
 
@@ -67,16 +69,16 @@ if cfg.machine == 'TWCC':
     )
 else:
     cfg.data_dir = (
-        "/home/haolun/dataset"
+        "/dccstor/epochs/gwallace/eerai/energy-efficient-resilience/dataset"
     )
     cfg.model_dir = (
-        "model_weights/symmetric_signed/"
+        "/dccstor/epochs/gwallace/eerai/energy-efficient-resilience/model_weights/symmetric_signed/"
     )
     cfg.save_dir = (
-        "/home/haolun/tmp/"
+        "/dccstor/epochs/gwallace/eerai/energy-efficient-resilience/tmp/"
     )
     cfg.save_dir_curve = (
-        "/home/haolun/tmp_curve/"
+        "/dccstor/epochs/gwallace/eerai/energy-efficient-resilience/tmp_curve/"
     )
     
 

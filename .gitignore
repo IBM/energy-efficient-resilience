@@ -1,3 +1,7 @@
 venv
 venv-*
 __pycache__
+dataset
+model_weights
+err*
+out*

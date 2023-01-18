@@ -31,7 +31,7 @@ torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 #sparsityWt = [0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0]
-sparsityWt = [0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0]
+SparsityWt = [0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0]
 layer_loss = {}
 layer_counter = 0
 total_values_dict = {}
@@ -109,11 +109,16 @@ class OutProgram(nn.Module):
         self.num_classes = 10
         self.cfg=cfg
         self.out_transform = torch.nn.Linear(self.num_classes, self.num_classes)
-        #self.P_out = None
-        #self.init_transform(transform_path)
+        self.init_transform(transform_path)
 
     # Initialize Perturbation
-    #def init_transform(self, transform_path):
+    def init_transform(self, transform_path):
+        if isinstance(self.out_transform, nn.Linear):
+            #diag = torch.nn.diagflat(torch.ones(self.num_classes))
+            #torch.nn.init.normal_(self.out_transform.weight, 0, 0.0001)
+            torch.nn.init.eye_(self.out_transform.weight)
+            torch.nn.init.constant_(self.out_transform.bias, 0)
+
     #    init_p = torch.ones((self.num_classes))
     #    self.P_out = Parameter((torch.randn(init_p.shape)) * 0.01, requires_grad=True)
         #if transform_path is not None:
@@ -403,13 +408,15 @@ def transform_train(
     for name, param in Pg.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
-    for name, param in Opg.parameters():
+    for name, param in Opg.named_parameters():
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
     print(
         "========== Start training the parameter"
     
     )
+    lb = np.array(SparsityWt, dtype=np.float32)
+
     for epoch in range(cfg.epochs):
         running_loss = 0
         running_sparsity_loss = 0
@@ -427,14 +434,14 @@ def transform_train(
             image, label = image.to(device), label.to(device)
             image_adv = Pg(image)  
             #print(torch.min(Pg.P), torch.max(Pg.P))
-            out = model(image_adv) 
+            logits = model(image_adv) 
             
-            #logits_adv = Opg(out)
-            #logits_adv = out
+            logits_adv = Opg(logits)
+            #logits_adv = logits
             
-            loss_orig, pred_orig = compute_loss(out, label)
+            loss_orig, pred_orig = compute_loss(logits_adv, label)
             running_correct += torch.sum(pred_orig == label.data).item()
-            l_sparsity, density, layerwise_density,_ = compute_sparsity_loss(sparsityWt)
+            l_sparsity, density, layerwise_density,_ = compute_sparsity_loss(lb)
             total_loss = loss_orig + l_sparsity
             #total_loss = l_sparsity
             running_loss += total_loss.item()
@@ -443,10 +450,13 @@ def transform_train(
             # Pg.zero_grad()
             total_loss.backward()
             optimizer.step()
+            #if (batch_id % 100 == 0):
+            #    print(running_correct)
             
             
             
-
+        
+        print(running_correct)
         lr_scheduler.step()
         accuracy = running_correct / len(trainloader.dataset)
         running_loss = running_loss / len(trainloader)
@@ -463,15 +473,15 @@ def transform_train(
         #    accuracy_checking(model, trainloader, testloader, Pg, device, use_transform=True)
         if (epoch + 1) % 20 == 0 or (epoch + 1) == cfg.epochs:
             torch.save({'input_transform': Pg.P},'{}/{}_W_{}.pt'.format(cfg.save_dir, arch, epoch + 1))
-            accuracy_checking(model, trainloader, testloader, Pg, sparsityWt, device, use_transform=True)
+            accuracy_checking(model, trainloader, testloader, Pg, Opg, lb, device, use_transform=True)
 
-            #lb += 0.5
-            #print("Lambda value: ", lb)
+            lb *= 0.8
+            print("Lambda value: ", lb)
 
 
 
 def accuracy_checking(
-    model, trainloader, testloader, pg, lambda_loss, device, use_transform=False
+    model, trainloader, testloader, pg, opg, lambda_loss, device, use_transform=False
 ):
     # For training data first:
     total_train = 0
@@ -492,7 +502,8 @@ def accuracy_checking(
         x, y = x.to(device), y.to(device)
         if use_transform:
             x_adv = pg(x)
-            out = model(x_adv)
+            logits = model(x_adv)
+            out = opg(logits)
         else:
             out = model(x)
         _, pred = out.max(1)
@@ -535,7 +546,8 @@ def accuracy_checking(
         x, y = x.to(device), y.to(device)
         if use_transform:
             x_adv = pg(x)
-            out = model(x_adv)
+            logits = model(x_adv)
+            out = opg(logits)
         else:
             out = model(x)
         _, pred = out.max(1)

@@ -44,12 +44,15 @@ def inference(
         position,
     )
 
-    if arch == "resnet18" or arch == "resnet34":
-        stats.resnet_register_hooks(model, arch)
-    elif arch == "vgg16" or arch == "vgg11":
-        stats.vgg_register_hooks(model, arch)
-    else:
-        print("Inspection/Results hooks not implemented for: %s" % arch)
+    print(model)
+    stats.inspect_model(model)
+
+    #if arch == "resnet18" or arch == "resnet34":
+    #    stats.resnet_register_hooks(model, arch)
+    #elif arch == "vgg16" or arch == "vgg11":
+    #    stats.vgg_register_hooks(model, arch)
+    #else:
+    #    print("Inspection/Results hooks not implemented for: %s" % arch)
 
     logger = stats.DataLogger(
         int(len(testloader.dataset) / testloader.batch_size),
@@ -67,6 +70,9 @@ def inference(
 
     with torch.no_grad():
         for t, (inputs, classes) in enumerate(testloader):
+            if (debug):
+                if t>0:
+                    exit()
             inputs = inputs.to(device)
             classes = classes.to(device)
             model_outputs = model(inputs)
@@ -81,3 +87,5 @@ def inference(
         "Eval Accuracy %.3f"
         % (running_correct.double() / (len(testloader.dataset)))
     )
+    #inspect models post error injection
+    #stats.inspect_model(model)

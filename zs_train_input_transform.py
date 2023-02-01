@@ -185,12 +185,13 @@ def transform_train(
     model_perturbed.eval()
     Pg.train()
 
-    optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, Pg.parameters()),
-        lr=cfg.learning_rate,
-        betas=(0.5, 0.999),
-        weight_decay=5e-4,
-    )
+    #optimizer = torch.optim.Adam(
+    #    filter(lambda p: p.requires_grad, Pg.parameters()),
+    #    lr=cfg.learning_rate,
+    #    betas=(0.5, 0.999),
+    #    weight_decay=5e-4,
+    #)
+    optimizer = optim.SGD(filter(lambda p: p.requires_grad, Pg.parameters()), lr=cfg.learning_rate, momentum=0.9)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(
         optimizer, step_size=4, gamma=cfg.decay
     )

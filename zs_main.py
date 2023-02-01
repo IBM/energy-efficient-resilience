@@ -191,15 +191,15 @@ def main():
     )
 
     args = parser.parse_args()
-    cfg.epochs = args.epochs
-    cfg.learning_rate = args.learning_rate
-    cfg.batch_size = args.batch_size
-    cfg.test_batch_size = args.test_batch_size
-    cfg.lb = args.lambdaVal
-    cfg.N = args.N_perturbed_model
-    cfg.G = args.Generator
-    cfg.PGD_STEP = args.pgd_step
-    cfg.G = args.Generator
+    #cfg.epochs = args.epochs
+    #cfg.learning_rate = args.learning_rate
+    #cfg.batch_size = args.batch_size
+    #cfg.test_batch_size = args.test_batch_size
+    #cfg.lb = args.lambdaVal
+    #cfg.N = args.N_perturbed_model
+    #cfg.G = args.Generator
+    #cfg.PGD_STEP = args.pgd_step
+    #cfg.G = args.Generator
 
 
     # if args.position>args.precision-1:

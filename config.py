@@ -23,16 +23,16 @@ cfg.faulty_layers = []
 #cfg.faulty_layers = ['conv', 'l1', 'l2', 'l3', 'l4', 'linear']  # For ResNet18
 # cfg.faulty_layers = ["linear", "conv"]
 
-cfg.batch_size = 512
+cfg.batch_size = 128
 cfg.test_batch_size = 100
-cfg.epochs = 2
+cfg.epochs = 60
 cfg.precision = 8
 
 # cifar10 training parameters
-cfg.learning_rate = 1e-2
-cfg.lr_decay = 0.1
-cfg.lr_step = [100]
-cfg.weight_decay = 5e-4
+#cfg.learning_rate = 1e-2
+#cfg.lr_decay = 0.1
+#cfg.lr_step = [80]
+#cfg.weight_decay = 5e-4
 
 #cifar100 training parameters
 #cfg.learning_rate = 1e-2
@@ -41,44 +41,50 @@ cfg.weight_decay = 5e-4
 #cfg.weight_decay = 5e-4
 
 # Nandhini - sparsity experiments 
-#cfg.learning_rate = 1e-3
-#cfg.lr_decay = 1.0
-#cfg.weight_decay = 5e-4
-#cfg.w1 = 32  # 28 #224
-#cfg.h1 = 32  # 28 #224
-#cfg.w2 = 32  # 32 28 #224
-#cfg.h2 = 32  # 32 28 #224
+cfg.learning_rate = 0.001
+cfg.lr_step = 4
+cfg.lr_decay = 0.9
+cfg.weight_decay = 5e-4
 
 
+#cfg.learning_rate = 0.01
+#cfg.lr_step = 100
+#cfg.lr_decay = 0.1
+#cfg.weight_decay = 5e-5
+cfg.w1 = 32  # 28 #224
+cfg.h1 = 32  # 28 #224
+cfg.w2 = 32  # 32 28 #224
+cfg.h2 = 32  # 32 28 #224
+cfg.channels = 3
 
 # For setting the machine
-if cfg.machine == 'TWCC':
-    cfg.data_dir = (
-        "/home/u7590150/dataset"
-    )
-    cfg.model_dir = (
-        "model_weights/symmetric_signed/"
-    )
-    cfg.save_dir = (
-        "/home/u7590150/tmp/"
-    )
-    cfg.save_dir_curve = (
-        "/home/u7590150/tmp_curve/"
-    )
-else:
-    cfg.data_dir = (
-        "/home/haolun/dataset"
-    )
-    cfg.model_dir = (
-        "model_weights/symmetric_signed/"
-    )
-    cfg.save_dir = (
-        "/home/haolun/tmp/"
-    )
-    cfg.save_dir_curve = (
-        "/home/haolun/tmp_curve/"
-    )
-    
+#if cfg.machine == 'TWCC':
+#    cfg.data_dir = (
+#        "/home/u7590150/dataset"
+#    )
+#    cfg.model_dir = (
+#        "model_weights/symmetric_signed/"
+#    )
+#    cfg.save_dir = (
+#        "/home/u7590150/tmp/"
+#    )
+#    cfg.save_dir_curve = (
+#        "/home/u7590150/tmp_curve/"
+#    )
+#else:
+#    cfg.data_dir = (
+#        "/home/haolun/dataset"
+#    )
+#    cfg.model_dir = (
+#        "model_weights/symmetric_signed/"
+#    )
+#    cfg.save_dir = (
+#        "/home/haolun/tmp/"
+#    )
+#    cfg.save_dir_curve = (
+#        "/home/haolun/tmp_curve/"
+#    )
+#    
 
 #cfg.data_dir = (
 #    "~/datasets"
@@ -92,6 +98,16 @@ else:
 #cfg.save_dir_curve = (
 #    "./eerai_saved"
 #)
+
+cfg.data_dir = (
+    "/gpfs/u/barn/RAIM/shared/datasets"
+)
+cfg.save_dir = (
+    "/gpfs/u/scratch/RAIM/RAIMndch/energy-efficient-resilience-save-dir"
+)
+cfg.model_dir = (
+    "/gpfs/u/scratch/RAIM/RAIMndch/energy-efficient-resilience-save-dir"
+)
 
 
 

@@ -31,7 +31,7 @@ torch.manual_seed(0)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 #sparsityWt = [0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0]
-SparsityWt = [0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0]
+SparsityWt = [0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0]
 layer_loss = {}
 layer_counter = 0
 total_values_dict = {}
@@ -383,8 +383,6 @@ def transform_train(
 
     model.eval()
 
-    #accuracy_checking(model, trainloader, testloader, Pg, device, use_transform=False)
-    #accuracy_checking(model, trainloader, testloader, Pg, sparsityWt, device, use_transform=True)
     params = []
     for param in Pg.parameters():
         params.append(param)
@@ -412,10 +410,15 @@ def transform_train(
         print("Param name: {}, grads is: {}".format(name, param.requires_grad))
 
     print(
-        "========== Start training the parameter"
+        "========== Original Accuracy and Density computation"
     
     )
     lb = np.array(SparsityWt, dtype=np.float32)
+    accuracy_checking(model, trainloader, testloader, Pg, Opg, lb, device, use_transform=True)
+    print(
+        "========== Start training the parameter"
+    
+    )
 
     for epoch in range(cfg.epochs):
         running_loss = 0
@@ -435,8 +438,10 @@ def transform_train(
             image_adv = Pg(image)  
             #print(torch.min(Pg.P), torch.max(Pg.P))
             logits = model(image_adv) 
-            
+            #print(logits[0,:])
             logits_adv = Opg(logits)
+            #print(logits_adv[0,:])
+            #pdb.set_trace()
             #logits_adv = logits
             
             loss_orig, pred_orig = compute_loss(logits_adv, label)
@@ -449,6 +454,14 @@ def transform_train(
             optimizer.zero_grad()
             # Pg.zero_grad()
             total_loss.backward()
+
+            #pdb.set_trace()
+            #print(Opg.out_transform.weight.grad)
+
+            # gradient clipping
+            torch.nn.utils.clip_grad_norm_(Pg.parameters(), max_norm=0.001, norm_type=2)
+            torch.nn.utils.clip_grad_norm_(Opg.parameters(), max_norm=0.001, norm_type=2)
+
             optimizer.step()
             #if (batch_id % 100 == 0):
             #    print(running_correct)
@@ -456,7 +469,6 @@ def transform_train(
             
             
         
-        print(running_correct)
         lr_scheduler.step()
         accuracy = running_correct / len(trainloader.dataset)
         running_loss = running_loss / len(trainloader)
@@ -471,7 +483,7 @@ def transform_train(
         )
         #if ((epoch+1) % 5 == 0):
         #    accuracy_checking(model, trainloader, testloader, Pg, device, use_transform=True)
-        if (epoch + 1) % 20 == 0 or (epoch + 1) == cfg.epochs:
+        if (epoch + 1) % 10 == 0 or (epoch + 1) == cfg.epochs:
             torch.save({'input_transform': Pg.P},'{}/{}_W_{}.pt'.format(cfg.save_dir, arch, epoch + 1))
             accuracy_checking(model, trainloader, testloader, Pg, Opg, lb, device, use_transform=True)
 

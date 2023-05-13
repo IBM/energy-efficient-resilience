@@ -97,7 +97,7 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
             delta = max_val / (2 ** (precision - 1) - 1)
             input_clamped = torch.clamp(input, -max_val, max_val)
             input_q = torch.round((input_clamped / delta))
-            if precision == 8:
+            if precision > 0 and precision <= 8:
                 input_q = input_q.to(torch.int8)
             elif precision == 16:
                 input_q = input_q.to(torch.int16)
@@ -110,11 +110,6 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
             input_dq = input_q * delta
             input_dq = input_dq.to(torch.float32)
         # Return the dequantized weights tensor.
-        # We want to update the original weights(not quantized weights) under
-        # quantization aware training.
-        # So, we don't use input.copy_(input_dq) to replace self.weight with
-        # input_dq.
-
         return input_dq
 
     # Straight-through-estimator in backward pass

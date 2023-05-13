@@ -33,7 +33,7 @@ from torch.nn.modules.utils import _pair
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import faultsMap as fmap
-
+import pdb
 # from torch.nn.modules.utils import _single
 
 debug = False
@@ -93,7 +93,14 @@ class FaultInject(torch.autograd.Function):
             delta = max_val / (2 ** (precision - 1) - 1)
             input_clamped = torch.clamp(input, -max_val, max_val)
             input_q = torch.round((input_clamped / delta))
-            input_q = input_q.to(torch.int8)
+            if precision > 0 and precision <= 8:
+                input_q = input_q.to(torch.int8)
+            elif precision == 16:
+                input_q = input_q.to(torch.int16)
+            else:
+                input_q = input_q.to(torch.int32)
+
+
 
         """
             Inject faults in the quantized weight
@@ -108,6 +115,13 @@ class FaultInject(torch.autograd.Function):
             What we do is we let input_q be int32, and preserve the last m-bit to be the unsigned integer.
             (The first 24 bits are still "0" after apply any bit operation below.)
             We can't convert anything to uint8 here because this will let input_dq become uint8, too!
+
+            Since the biterrormaps are also guaranteed to generate faults only
+            in valid bit positions the following operations computed in int8
+            will work for <8 bits of precision. For example, when precision = 6
+            bits, there can be never be faults in the first 2 MSBs of the uint8
+            faultmap.  The MSB of BitErrorMap1to0 will be 11 and BitErrorMap0to1 will be 00. 
+            A conversion to int8 is necessary at the end, since the output by default is uint8 for pytorch.
 
         """
 
@@ -141,9 +155,6 @@ class FaultInject(torch.autograd.Function):
         input_dq_clamped = torch.clamp(input_dq, torch.min(input), torch.max(input))
 
         # Return the perturbed-dequantized weights tensor.
-        # We want to perturb the weights just for one time.
-        # So, we don't use input.copy_(input_dq) to replace
-        # self.weight with input_dq.
         return input_dq
 
     # Straight-through-estimator in backward pass
@@ -213,17 +224,19 @@ class nnLinearPerturbWeight(nn.Linear):
     def genFaultMap(
         self, BitErrorMap_flip0to1, BitErrorMap_flip1to0, precision, weights
     ):
-
         numweights = torch.numel(weights)
 
         mem_array_rows = BitErrorMap_flip0to1.shape[0]
         mem_array_cols = BitErrorMap_flip0to1.shape[1]
 
-        weights_per_row = (int)(mem_array_cols / precision)
+        # When the bit precision does not divide MEM_COLS, a few bits at the end of the row are wasted storage
+        weights_per_row = math.floor(mem_array_cols / precision)
 
         # Because in random bit error, BitErrorMap0to1 and BitErrorMap1to0 will be the same for every layers in the same perturbed model
         # Therefore, calculate the for loop for once is enough.
         if fmap.BitErrorMap0to1 is None and fmap.BitErrorMap1to0 is None:
+
+            # For all precisions <=8, this bit error map will be stored as unsigned 8 bit integer. 
             BitErrorMap0to1 = torch.zeros(
                 (mem_array_rows, weights_per_row), dtype=torch.uint8
             ).to(device)
@@ -349,12 +362,11 @@ class nnConv2dPerturbWeight(nn.Conv2d):
         self, BitErrorMap_flip0to1, BitErrorMap_flip1to0, precision, weights
     ):
 
-        
         numweights = torch.numel(weights)
         mem_array_rows = BitErrorMap_flip0to1.shape[0]
         mem_array_cols = BitErrorMap_flip0to1.shape[1]
 
-        weights_per_row = (int)(mem_array_cols / precision)
+        weights_per_row = math.floor(mem_array_cols / precision)
 
         # Because in random bit error, BitErrorMap0to1 and BitErrorMap1to0 will be the same for every layers in the same perturbed model
         # Therefore, calculate the for loop for once is enough.

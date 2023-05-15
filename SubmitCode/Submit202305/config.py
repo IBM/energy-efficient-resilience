@@ -55,4 +55,4 @@ cfg.endSeed = 50010
 
 # For transform_eval
 cfg.testing_mode = 'generator_base' # clean / generator_base
-cfg.G_PATH = ''                                          
+cfg.G_PATH = ''                               

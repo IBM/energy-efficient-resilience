@@ -12,7 +12,6 @@ import tqdm
 import copy
 
 from models import init_models_pairs, create_faults
-from models.generator_awp import *
 from models.generator import *
 import faultsMap as fmap
 from config import cfg
@@ -126,32 +125,18 @@ def transform_train(trainloader, testloader, arch, dataset, in_channels, precisi
 
     storeLoss = []
 
-    if 'preactresnet18' in arch:
-        if cfg.G == 'ConvL':
-            Gen = GeneratorConvLQ_AWP(precision)
-        elif cfg.G == 'ConvS':
-            Gen = GeneratorConvSQ_AWP(precision)
-        elif cfg.G == 'DeConvL':
-            Gen = GeneratorDeConvLQ_AWP(precision)
-        elif cfg.G == 'DeConvS':
-            Gen = GeneratorDeConvSQ_AWP(precision)
-        elif cfg.G == 'UNetL':
-            Gen = GeneratorUNetLQ_AWP(precision)
-        elif cfg.G == 'UNetS':
-            Gen = GeneratorUNetSQ_AWP(precision)
-    else:
-        if cfg.G == 'ConvL':
-            Gen = GeneratorConvLQ(precision)
-        elif cfg.G == 'ConvS':
-            Gen = GeneratorConvSQ(precision)
-        elif cfg.G == 'DeConvL':
-            Gen = GeneratorDeConvLQ(precision)
-        elif cfg.G == 'DeConvS':
-            Gen = GeneratorDeConvSQ(precision)
-        elif cfg.G == 'UNetL':
-            Gen = GeneratorUNetLQ(precision)
-        elif cfg.G == 'UNetS':
-            Gen = GeneratorUNetSQ(precision)
+    if cfg.G == 'ConvL':
+        Gen = GeneratorConvLQ(precision)
+    elif cfg.G == 'ConvS':
+        Gen = GeneratorConvSQ(precision)
+    elif cfg.G == 'DeConvL':
+        Gen = GeneratorDeConvLQ(precision)
+    elif cfg.G == 'DeConvS':
+        Gen = GeneratorDeConvSQ(precision)
+    elif cfg.G == 'UNetL':
+        Gen = GeneratorUNetLQ(precision)
+    elif cfg.G == 'UNetS':
+        Gen = GeneratorUNetSQ(precision)
         
     Gen = Gen.to(device)
 

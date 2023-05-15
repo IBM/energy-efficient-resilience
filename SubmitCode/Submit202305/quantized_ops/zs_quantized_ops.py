@@ -82,8 +82,8 @@ class SymmetricQuantizeDequantize(torch.autograd.Function):
             delta = max_val / (2 ** (precision - 1) - 1)
             input_clamped = torch.clamp(input, -max_val, max_val)
             input_q = torch.round((input_clamped / delta))
-            if precision == 8:
-                input_q = input_q.to(torch.int32)
+            if precision > 0 and precision <= 8:
+                input_q = input_q.to(torch.int8)
             elif precision == 16:
                 input_q = input_q.to(torch.int16)
             else:

@@ -73,7 +73,12 @@ class FaultInject(torch.autograd.Function):
             delta = max_val / (2 ** (precision - 1) - 1)
             input_clamped = torch.clamp(input, -max_val, max_val)
             input_q = torch.round((input_clamped / delta))
-            input_q = input_q.to(torch.int8)
+            if precision > 0 and precision <= 8:
+                input_q = input_q.to(torch.int8)
+            elif precision == 16:
+                input_q = input_q.to(torch.int16)
+            else:
+                input_q = input_q.to(torch.int32)
 
         """
             Inject faults in the quantized weight
@@ -184,7 +189,7 @@ class nnLinearPerturbWeight(nn.Linear):
         mem_array_rows = BitErrorMap_flip0to1.shape[0]
         mem_array_cols = BitErrorMap_flip0to1.shape[1]
 
-        weights_per_row = (int)(mem_array_cols / precision)
+        weights_per_row = math.floor(mem_array_cols / precision)
 
         # Because in random bit error, BitErrorMap0to1 and BitErrorMap1to0 will be the same for every layers in the same perturbed model
         # Therefore, calculate the for loop for once is enough.
@@ -311,7 +316,7 @@ class nnConv2dPerturbWeight(nn.Conv2d):
         mem_array_rows = BitErrorMap_flip0to1.shape[0]
         mem_array_cols = BitErrorMap_flip0to1.shape[1]
 
-        weights_per_row = (int)(mem_array_cols / precision)
+        weights_per_row = math.floor(mem_array_cols / precision)
 
         # Because in random bit error, BitErrorMap0to1 and BitErrorMap1to0 will be the same for every layers in the same perturbed model
         # Therefore, calculate the for loop for once is enough.

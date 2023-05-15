@@ -4,8 +4,6 @@ import torch
 from .resnetf_pytorch import resnetfPy
 from .resnetf import resnetf
 from .resnet import resnet
-from .preactresnetf import preactresnetf
-from .preactresnet import PreActResNet18
 from .vggf_pytorch import vggfPy
 from .vggf import vggf
 from .vgg import vgg
@@ -64,9 +62,6 @@ def init_models(arch, in_channels, precision, retrain, checkpoint_path, dataset=
             model = resnetf("resnet18", classes, precision, 0, 0, [])
         else:
             model = resnet("resnet18", classes, precision)
-    elif arch == "preactresnet18":
-        if precision > 0:
-            model = preactresnetf("preactresnet18", classes, precision, 0, 0, [])
     elif arch == "resnet34":
         if precision > 0:
             model = resnetf("resnet34", classes, precision, 0, 0, [])
@@ -186,15 +181,6 @@ def init_models_faulty(arch, in_channels, precision, retrain, checkpoint_path, f
         elif arch == "resnet18":
             model = resnetf(
                 "resnet18",
-                classes,
-                precision,
-                bit_error_rate,
-                position,
-                faulty_layers,
-            )
-        elif arch == "preactresnet18":
-            model = preactresnetf(
-                "preactresnet18",
                 classes,
                 precision,
                 bit_error_rate,

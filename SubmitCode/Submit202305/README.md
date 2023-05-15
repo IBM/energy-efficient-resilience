@@ -1,6 +1,6 @@
 ### Based model training:
 ```python
-python zs_main.py [resnet18 | resnet50 | vgg11 | vgg16 | vgg19] train [cifar10 | gtsrb | cifar100] -ber 0.01 -cp [please input the model path here] -E 300 -LR 0.001 -BS 256 
+python zs_main.py [resnet18 | resnet50 | vgg11 | vgg16 | vgg19] train [cifar10 | gtsrb | cifar100] -E 300 -LR 0.001 -BS 256 
 ```
 
 ### NerualFuse training:
@@ -14,4 +14,4 @@ python zs_main.py [resnet18 | resnet50 | vgg11 | vgg16 | vgg19] transform_eval [
 ```
 
 #### Choose Dataset:
-* cifar10、cifar100、gtsrb、imagenet128、imagenet224
+* cifar10、cifar100、gtsrb、imagenet224
